@@ -4,7 +4,21 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React + TS</title>
+    <title>CygnusWealth - Portfolio Tracker</title>
+    <script>
+      // Filter out SES warnings from wallet extensions
+      const originalConsoleWarn = console.warn;
+      console.warn = function(...args) {
+        const message = args[0]?.toString() || '';
+        // Filter out specific SES deprecation warnings
+        if (message.includes('dateTaming') || 
+            message.includes('mathTaming') || 
+            message.includes('Removing unpermitted intrinsics')) {
+          return;
+        }
+        originalConsoleWarn.apply(console, args);
+      };
+    </script>
   </head>
   <body>
     <div id="root"></div>

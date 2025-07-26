@@ -12,16 +12,15 @@ import {
 } from '@chakra-ui/react';
 import { Formik, Form, Field } from 'formik';
 import * as yup from 'yup';
-import { 
-  useEvmBalanceRealTime, 
+// For now, use the compatibility layer until the libraries are properly built
+import {
+  useEvmBalanceRealTime,
   useEvmTransactionMonitor,
   ConnectionManager,
-  type ConnectionStatus
-} from '@cygnus-wealth/evm-integration';
-
-import {
+  type ConnectionStatus,
   type Transaction
-} from '@cygnus-wealth/data-models';
+} from '../types/evm-integration';
+import { safeDate } from '../utils/ses-compatibility';
 
 
 const addressValidationSchema = yup.object({
@@ -36,7 +35,7 @@ const toaster = createToaster({
 });
 
 // Create a singleton connection manager instance
-const connectionManager = new ConnectionManager();
+let connectionManager: any;
 
 export default function Dashboard() {
   const [trackedAddress, setTrackedAddress] = useState<string | null>(null);
@@ -67,14 +66,22 @@ export default function Dashboard() {
 
   // Monitor connection status
   useState(() => {
-    const unsubscribe = connectionManager.onStatusChange((status: ConnectionStatus) => {
-      setConnectionStatuses(prev => {
-        const newMap = new Map(prev);
-        newMap.set(status.chainId, status);
-        return newMap;
+    // Initialize connection manager when component mounts
+    if (!connectionManager && ConnectionManager) {
+      connectionManager = new ConnectionManager();
+    }
+    
+    if (connectionManager) {
+      const unsubscribe = connectionManager.onStatusChange((status: ConnectionStatus) => {
+        setConnectionStatuses(prev => {
+          const newMap = new Map(prev);
+          newMap.set(status.chainId, status);
+          return newMap;
+        });
       });
-    });
-    return unsubscribe;
+      return unsubscribe;
+    }
+    return () => {};
   });
 
   const handleAddressSubmit = async (values: { address: string }) => {
@@ -115,7 +122,7 @@ export default function Dashboard() {
             
             {connectionStatuses.get(1)?.lastConnected && (
               <Text fontSize="sm" color="gray.500">
-                Connected at: {new Date(connectionStatuses.get(1)?.lastConnected || 0).toLocaleTimeString()}
+                Connected at: {safeDate.toLocaleTimeString(new Date(connectionStatuses.get(1)?.lastConnected || 0))}
               </Text>
             )}
           </Box>
@@ -202,7 +209,7 @@ export default function Dashboard() {
                     {balance.amount} {balance.asset?.symbol || 'ETH'}
                   </Text>
                   <Text fontSize="sm" color="gray.500">
-                    Last updated: {new Date().toLocaleTimeString()}
+                    Last updated: {safeDate.toLocaleTimeString(new Date())}
                   </Text>
                 </Box>
 
@@ -256,7 +263,7 @@ export default function Dashboard() {
                         {tx.assets_out?.[0]?.asset.symbol || tx.assets_in?.[0]?.asset.symbol || 'ETH'}
                       </Text>
                       <Text fontSize="xs" color="gray.600">
-                        {new Date(tx.timestamp).toLocaleTimeString()}
+                        {safeDate.toLocaleTimeString(new Date(tx.timestamp))}
                       </Text>
                     </Box>
                   </Box>
