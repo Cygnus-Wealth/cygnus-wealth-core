@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 // Test that all expected exports from @cygnus-wealth/evm-integration are available
-describe.skip('EVM Integration Library Exports (skipped until libraries are built)', () => {
+describe('EVM Integration Library Exports', () => {
   it('should export all required hooks', async () => {
     const evmIntegration = await import('@cygnus-wealth/evm-integration');
     

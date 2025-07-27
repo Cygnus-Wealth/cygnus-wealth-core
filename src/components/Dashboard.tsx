@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Container,
@@ -12,14 +12,16 @@ import {
 } from '@chakra-ui/react';
 import { Formik, Form, Field } from 'formik';
 import * as yup from 'yup';
-// For now, use the compatibility layer until the libraries are properly built
+// Import from the real evm-integration library
 import {
   useEvmBalanceRealTime,
   useEvmTransactionMonitor,
   ConnectionManager,
-  type ConnectionStatus,
+  type ConnectionStatus
+} from '@cygnus-wealth/evm-integration';
+import {
   type Transaction
-} from '../types/evm-integration';
+} from '@cygnus-wealth/data-models';
 import { safeDate } from '../utils/ses-compatibility';
 
 
@@ -187,17 +189,17 @@ export default function Dashboard() {
           <Box p={6} bg="white" borderRadius="lg" border="1px solid" borderColor="gray.200" shadow="sm">
             <Stack gap={4}>
               <Box display="flex" justifyContent="space-between" alignItems="center">
-                <Heading as="h2" size="lg">
+                <Heading as="h2" size="lg" color="gray.800">
                   Real-Time Balance
                 </Heading>
-                {isLoading && <Spinner size="sm" />}
+                {isLoading && <Spinner size="sm" color="blue.500" />}
               </Box>
 
               <Box>
                 <Text fontSize="sm" color="gray.600" mb={2}>
                   Address
                 </Text>
-                <Text fontSize="md" fontFamily="mono" wordBreak="break-all">
+                <Text fontSize="md" fontFamily="mono" wordBreak="break-all" color="gray.700">
                   {trackedAddress}
                 </Text>
               </Box>
@@ -205,7 +207,7 @@ export default function Dashboard() {
               <Stack direction="row" gap={8} justify="space-around">
                 <Box textAlign="center">
                   <Text fontSize="sm" color="gray.600">ETH Balance</Text>
-                  <Text fontSize="3xl" fontWeight="bold">
+                  <Text fontSize="3xl" fontWeight="bold" color="gray.900">
                     {balance.amount} {balance.asset?.symbol || 'ETH'}
                   </Text>
                   <Text fontSize="sm" color="gray.500">
@@ -235,7 +237,7 @@ export default function Dashboard() {
         {/* Recent Transactions */}
         {transactions.length > 0 && (
           <Box p={6} bg="white" borderRadius="lg" border="1px solid" borderColor="gray.200" shadow="sm">
-            <Heading as="h3" size="md" mb={4}>
+            <Heading as="h3" size="md" mb={4} color="gray.800">
               Recent Transactions
             </Heading>
             <Stack gap={3}>
@@ -250,7 +252,7 @@ export default function Dashboard() {
                 >
                   <Box display="flex" justifyContent="space-between" alignItems="center">
                     <Box>
-                      <Text fontSize="sm" fontFamily="mono">
+                      <Text fontSize="sm" fontFamily="mono" color="gray.700">
                         {tx.hash ? `${tx.hash.slice(0, 10)}...${tx.hash.slice(-8)}` : tx.id}
                       </Text>
                       <Text fontSize="xs" color="gray.600">
@@ -258,7 +260,7 @@ export default function Dashboard() {
                       </Text>
                     </Box>
                     <Box textAlign="right">
-                      <Text fontSize="sm" fontWeight="bold">
+                      <Text fontSize="sm" fontWeight="bold" color="gray.800">
                         {tx.assets_out?.[0]?.amount || tx.assets_in?.[0]?.amount || '0'} 
                         {tx.assets_out?.[0]?.asset.symbol || tx.assets_in?.[0]?.asset.symbol || 'ETH'}
                       </Text>
