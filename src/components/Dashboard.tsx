@@ -23,6 +23,7 @@ import {
   type Transaction
 } from '@cygnus-wealth/data-models';
 import { safeDate } from '../utils/ses-compatibility';
+import { formatBalance } from '../utils/formatters';
 
 
 const addressValidationSchema = yup.object({
@@ -208,7 +209,10 @@ export default function Dashboard() {
                 <Box textAlign="center">
                   <Text fontSize="sm" color="gray.600">ETH Balance</Text>
                   <Text fontSize="3xl" fontWeight="bold" color="gray.900">
-                    {balance.amount} {balance.asset?.symbol || 'ETH'}
+                    {formatBalance(balance.amount, balance.asset?.decimals || 18)} {balance.asset?.symbol || 'ETH'}
+                  </Text>
+                  <Text fontSize="xs" color="gray.500" fontFamily="mono">
+                    Raw: {balance.amount} wei
                   </Text>
                   <Text fontSize="sm" color="gray.500">
                     Last updated: {safeDate.toLocaleTimeString(new Date())}
