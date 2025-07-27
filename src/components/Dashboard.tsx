@@ -1,102 +1,48 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Box,
   Container,
   Stack,
   Text,
-  Input,
   Button,
   Heading,
   Spinner,
-  createToaster
+  Table,
+  Badge,
+  Flex,
+  IconButton,
+  Grid,
+  Stat
 } from '@chakra-ui/react';
-import { Formik, Form, Field } from 'formik';
-import * as yup from 'yup';
-// Import from the real evm-integration library
-import {
-  useEvmBalanceRealTime,
-  useEvmTransactionMonitor,
-  ConnectionManager,
-  type ConnectionStatus
-} from '@cygnus-wealth/evm-integration';
-import {
-  type Transaction
-} from '@cygnus-wealth/data-models';
-import { safeDate } from '../utils/ses-compatibility';
-import { formatBalance } from '../utils/formatters';
+import { Link } from 'react-router-dom';
+import { FiChevronLeft, FiChevronRight, FiPlus } from 'react-icons/fi';
+import { useStore } from '../store/useStore';
+import { useAccountSync } from '../hooks/useAccountSync';
 
-
-const addressValidationSchema = yup.object({
-  address: yup
-    .string()
-    .required('Wallet address is required')
-    .matches(/^0x[a-fA-F0-9]{40}$/, 'Please enter a valid Ethereum address')
-});
-
-const toaster = createToaster({
-  placement: 'top'
-});
-
-// Create a singleton connection manager instance
-let connectionManager: any;
+const ITEMS_PER_PAGE = 10;
 
 export default function Dashboard() {
-  const [trackedAddress, setTrackedAddress] = useState<string | null>(null);
-  const [connectionStatuses, setConnectionStatuses] = useState<Map<number, ConnectionStatus>>(new Map());
+  const [currentPage, setCurrentPage] = useState(1);
+  
+  // Get data from global store
+  const { 
+    accounts, 
+    assets, 
+    portfolio, 
+    isLoading 
+  } = useStore();
+  
+  // Sync account balances
+  useAccountSync();
+  
+  // Get connected accounts count
+  const connectedAccounts = accounts.filter(acc => acc.status === 'connected').length;
 
-  // Real-time balance hook
-  const {
-    balance,
-    isLoading,
-    error,
-    isConnected
-  } = useEvmBalanceRealTime(
-    trackedAddress as `0x${string}` | undefined,
-    1, // Ethereum mainnet
-    {
-      enabled: !!trackedAddress
-    }
-  );
-
-  // Transaction monitoring
-  const { transactions } = useEvmTransactionMonitor(
-    trackedAddress as `0x${string}` | undefined,
-    1,
-    {
-      enabled: !!trackedAddress
-    }
-  );
-
-  // Monitor connection status
-  useState(() => {
-    // Initialize connection manager when component mounts
-    if (!connectionManager && ConnectionManager) {
-      connectionManager = new ConnectionManager();
-    }
-    
-    if (connectionManager) {
-      const unsubscribe = connectionManager.onStatusChange((status: ConnectionStatus) => {
-        setConnectionStatuses(prev => {
-          const newMap = new Map(prev);
-          newMap.set(status.chainId, status);
-          return newMap;
-        });
-      });
-      return unsubscribe;
-    }
-    return () => {};
-  });
-
-  const handleAddressSubmit = async (values: { address: string }) => {
-    setTrackedAddress(values.address);
-    
-    toaster.create({
-      title: 'Tracking Started',
-      description: `Now monitoring ${values.address}`,
-      type: 'success',
-      duration: 3000
-    });
-  };
+  // Pagination calculations
+  const totalPages = Math.ceil(assets.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const currentAssets = assets.slice(startIndex, endIndex);
 
   return (
     <Container maxW="container.xl" py={8}>
@@ -105,188 +51,167 @@ export default function Dashboard() {
           <Heading as="h1" size="4xl" mb={2}>
             Portfolio Dashboard
           </Heading>
-          <Text color="gray.600" mb={2}>
-            Enter an EVM wallet address to track your portfolio in real-time
+          <Text color="gray.600">
+            Your complete crypto portfolio overview
           </Text>
-          
-          {/* Connection Status */}
-          <Box display="flex" justifyContent="center" alignItems="center" gap={4}>
-            <Box display="flex" alignItems="center" gap={2}>
-              <Box
-                w={3}
-                h={3}
-                borderRadius="full"
-                bg={isConnected ? "green.500" : "red.500"}
-              />
-              <Text fontSize="sm" color={isConnected ? "green.600" : "red.600"}>
-                {isConnected ? "Connected to Ethereum" : "Disconnected"}
-              </Text>
-            </Box>
-            
-            {connectionStatuses.get(1)?.lastConnected && (
-              <Text fontSize="sm" color="gray.500">
-                Connected at: {safeDate.toLocaleTimeString(new Date(connectionStatuses.get(1)?.lastConnected || 0))}
-              </Text>
-            )}
-          </Box>
         </Box>
 
-        <Box p={6} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
-          <Heading as="h2" size="lg" mb={4}>
-            Wallet Address
-          </Heading>
-          
-          <Formik
-            initialValues={{ address: '' }}
-            validationSchema={addressValidationSchema}
-            onSubmit={handleAddressSubmit}
-          >
-            {({ errors, touched, isValid, dirty }) => (
-              <Form>
-                <Stack gap={4}>
-                  <Field name="address">
-                    {({ field }: any) => (
-                      <Input
-                        {...field}
-                        placeholder="0x742D35Cc6634C0532925a3b8D404fEdBE87C2F0f"
-                        size="lg"
-                        bg="white"
-                        color="black"
-                        _placeholder={{ color: "gray.500" }}
-                      />
-                    )}
-                  </Field>
-                  {errors.address && touched.address && (
-                    <Box p={3} bg="red.100" borderRadius="md" color="red.800">
-                      {errors.address}
-                    </Box>
-                  )}
-                  <Button
-                    type="submit"
-                    colorScheme="blue"
-                    size="lg"
-                    loading={isLoading}
-                    disabled={!isValid || !dirty}
-                    width="full"
-                  >
-                    {isLoading ? 'Fetching Balance...' : 'Track Wallet'}
-                  </Button>
-                </Stack>
-              </Form>
-            )}
-          </Formik>
-        </Box>
-
-        {/* Error Display */}
-        {error && (
-          <Box p={4} bg="red.100" borderRadius="md" color="red.800">
-            <Text fontWeight="bold">Error:</Text>
-            <Text>{error.message}</Text>
-          </Box>
-        )}
-
-        {/* Balance Display */}
-        {balance && (
-          <Box p={6} bg="white" borderRadius="lg" border="1px solid" borderColor="gray.200" shadow="sm">
-            <Stack gap={4}>
-              <Box display="flex" justifyContent="space-between" alignItems="center">
-                <Heading as="h2" size="lg" color="gray.800">
-                  Real-Time Balance
-                </Heading>
-                {isLoading && <Spinner size="sm" color="blue.500" />}
-              </Box>
-
-              <Box>
-                <Text fontSize="sm" color="gray.600" mb={2}>
-                  Address
-                </Text>
-                <Text fontSize="md" fontFamily="mono" wordBreak="break-all" color="gray.700">
-                  {trackedAddress}
-                </Text>
-              </Box>
-
-              <Stack direction="row" gap={8} justify="space-around">
-                <Box textAlign="center">
-                  <Text fontSize="sm" color="gray.600">ETH Balance</Text>
-                  <Text fontSize="3xl" fontWeight="bold" color="gray.900">
-                    {formatBalance(balance.amount, balance.asset?.decimals || 18)} {balance.asset?.symbol || 'ETH'}
-                  </Text>
-                  <Text fontSize="xs" color="gray.500" fontFamily="mono">
-                    Raw: {balance.amount} wei
-                  </Text>
-                  <Text fontSize="sm" color="gray.500">
-                    Last updated: {safeDate.toLocaleTimeString(new Date())}
-                  </Text>
-                </Box>
-
-                <Box textAlign="center">
-                  <Text fontSize="sm" color="gray.600">Network Status</Text>
-                  <Box display="flex" alignItems="center" justifyContent="center" gap={2} mb={2}>
-                    {isConnected && (
-                      <Box w={2} h={2} borderRadius="full" bg="green.400" />
-                    )}
-                    <Text fontSize="sm" color="gray.500">
-                      WebSocket Connected
-                    </Text>
-                  </Box>
-                  <Text fontSize="xs" color="gray.400">
-                    Updates on every block
-                  </Text>
-                </Box>
-              </Stack>
-            </Stack>
-          </Box>
-        )}
-
-        {/* Recent Transactions */}
-        {transactions.length > 0 && (
-          <Box p={6} bg="white" borderRadius="lg" border="1px solid" borderColor="gray.200" shadow="sm">
-            <Heading as="h3" size="md" mb={4} color="gray.800">
-              Recent Transactions
+        {/* Portfolio Summary - Always visible */}
+        <Box p={6} bg="white" borderRadius="lg" border="1px solid" borderColor="gray.200" shadow="sm">
+          <Stack gap={4}>
+            <Heading as="h2" size="lg" color="gray.800">
+              Portfolio Summary
             </Heading>
-            <Stack gap={3}>
-              {transactions.slice(0, 5).map((tx: Transaction) => (
-                <Box 
-                  key={tx.id || tx.hash} 
-                  p={3} 
-                  bg="gray.50" 
-                  borderRadius="md"
-                  border="1px solid"
-                  borderColor="gray.200"
-                >
-                  <Box display="flex" justifyContent="space-between" alignItems="center">
-                    <Box>
-                      <Text fontSize="sm" fontFamily="mono" color="gray.700">
-                        {tx.hash ? `${tx.hash.slice(0, 10)}...${tx.hash.slice(-8)}` : tx.id}
-                      </Text>
-                      <Text fontSize="xs" color="gray.600">
-                        {tx.from === trackedAddress ? 'Outgoing' : 'Incoming'}
-                      </Text>
-                    </Box>
-                    <Box textAlign="right">
-                      <Text fontSize="sm" fontWeight="bold" color="gray.800">
-                        {tx.assets_out?.[0]?.amount || tx.assets_in?.[0]?.amount || '0'} 
-                        {tx.assets_out?.[0]?.asset.symbol || tx.assets_in?.[0]?.asset.symbol || 'ETH'}
-                      </Text>
-                      <Text fontSize="xs" color="gray.600">
-                        {safeDate.toLocaleTimeString(new Date(tx.timestamp))}
-                      </Text>
-                    </Box>
-                  </Box>
-                </Box>
-              ))}
-            </Stack>
-          </Box>
-        )}
+            
+            <Grid templateColumns={{ base: '1fr', md: 'repeat(3, 1fr)' }} gap={6}>
+              <Stat.Root>
+                <Stat.Label color="gray.600">Total Portfolio Value</Stat.Label>
+                <Stat.ValueText fontSize="3xl">
+                  ${portfolio.totalValue.toFixed(2)}
+                </Stat.ValueText>
+                <Stat.HelpText>USD</Stat.HelpText>
+              </Stat.Root>
+              
+              <Stat.Root>
+                <Stat.Label color="gray.600">Total Assets</Stat.Label>
+                <Stat.ValueText fontSize="3xl">
+                  {portfolio.totalAssets}
+                </Stat.ValueText>
+                <Stat.HelpText>Across all accounts</Stat.HelpText>
+              </Stat.Root>
+              
+              <Stat.Root>
+                <Stat.Label color="gray.600">Connected Accounts</Stat.Label>
+                <Stat.ValueText fontSize="3xl">
+                  {connectedAccounts}
+                </Stat.ValueText>
+                <Stat.HelpText>
+                  <Button as={Link} to="/settings/accounts" size="sm" variant="link" colorScheme="blue">
+                    {connectedAccounts === 0 ? 'Add accounts' : 'Manage'}
+                  </Button>
+                </Stat.HelpText>
+              </Stat.Root>
+            </Grid>
+          </Stack>
+        </Box>
 
-        {/* Status Footer */}
-        {trackedAddress && (
-          <Box textAlign="center">
-            <Text fontSize="sm" color="gray.500">
-              Real-time updates via WebSocket events • Zero polling • Instant notifications
-            </Text>
-          </Box>
-        )}
+        {/* Assets Table - Always visible */}
+        <Box p={6} bg="white" borderRadius="lg" border="1px solid" borderColor="gray.200" shadow="sm" position="relative">
+          <Stack gap={4}>
+            <Box display="flex" justifyContent="space-between" alignItems="center">
+              <Heading as="h2" size="lg" color="gray.800">
+                Assets
+              </Heading>
+              {isLoading && <Spinner size="sm" color="blue.500" />}
+            </Box>
+
+            <Box overflowX="auto" position="relative" minH="300px">
+              <Table.Root variant="line">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Asset</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="right">Balance</Table.ColumnHeader>
+                    <Table.ColumnHeader>Source</Table.ColumnHeader>
+                    <Table.ColumnHeader>Chain</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="right">Price (USD)</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="right">Value (USD)</Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {assets.length > 0 ? (
+                    currentAssets.map((asset) => (
+                      <Table.Row key={asset.id}>
+                        <Table.Cell>
+                          <Stack spacing={0}>
+                            <Text fontWeight="semibold">{asset.symbol}</Text>
+                            <Text fontSize="sm" color="gray.600">{asset.name}</Text>
+                          </Stack>
+                        </Table.Cell>
+                        <Table.Cell textAlign="right" fontFamily="mono">
+                          {asset.balance}
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Badge colorScheme="blue" variant="subtle">
+                            {asset.source}
+                          </Badge>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Badge colorScheme="purple" variant="subtle">
+                            {asset.chain}
+                          </Badge>
+                        </Table.Cell>
+                        <Table.Cell textAlign="right">
+                          ${asset.priceUsd?.toFixed(2) || '-'}
+                        </Table.Cell>
+                        <Table.Cell textAlign="right" fontWeight="semibold">
+                          ${asset.valueUsd?.toFixed(2) || '-'}
+                        </Table.Cell>
+                      </Table.Row>
+                    ))
+                  ) : (
+                    <Table.Row>
+                      <Table.Cell colSpan={6} textAlign="center" py={20}>
+                        <Stack spacing={4} align="center">
+                          <Box
+                            p={4}
+                            bg="gray.50"
+                            borderRadius="full"
+                            color="gray.400"
+                          >
+                            <FiPlus size={32} />
+                          </Box>
+                          <Text fontSize="lg" color="gray.600">
+                            No assets to display
+                          </Text>
+                          <Text color="gray.500">
+                            Add accounts to start tracking your portfolio
+                          </Text>
+                          <Button
+                            as={Link}
+                            to="/settings/accounts"
+                            colorScheme="blue"
+                            leftIcon={<FiPlus />}
+                          >
+                            Go to Settings → Accounts
+                          </Button>
+                        </Stack>
+                      </Table.Cell>
+                    </Table.Row>
+                  )}
+                </Table.Body>
+              </Table.Root>
+            </Box>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <Flex justify="space-between" align="center" mt={4}>
+                <Text fontSize="sm" color="gray.600">
+                  Showing {startIndex + 1}-{Math.min(endIndex, assets.length)} of {assets.length} assets
+                </Text>
+                <Stack direction="row" spacing={2}>
+                  <IconButton
+                    aria-label="Previous page"
+                    icon={<FiChevronLeft />}
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                  />
+                  <Button size="sm" variant="outline">
+                    {currentPage} / {totalPages}
+                  </Button>
+                  <IconButton
+                    aria-label="Next page"
+                    icon={<FiChevronRight />}
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                  />
+                </Stack>
+              </Flex>
+            )}
+          </Stack>
+        </Box>
+
       </Stack>
     </Container>
   );
