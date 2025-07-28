@@ -16,6 +16,7 @@ import { SiEthereum, SiSolana, SiBinance } from 'react-icons/si';
 import { useStore } from '../../store/useStore';
 import { useState } from 'react';
 import AddAccountModal from './AddAccountModal';
+import TokenManager from './TokenManager';
 
 // Platform icon mapping
 const platformIcons: Record<string, React.ElementType> = {
@@ -217,6 +218,13 @@ export default function Accounts() {
                       </Text>
                     )}
                   </Stack>
+
+                  {/* Token Manager for wallet accounts */}
+                  {account.type === 'wallet' && account.status === 'connected' && (
+                    <Box pt={4} borderTop="1px solid" borderColor="gray.200">
+                      <TokenManager accountId={account.id} platform={account.platform} />
+                    </Box>
+                  )}
 
                   {/* Connect/Disconnect Button */}
                   <Button

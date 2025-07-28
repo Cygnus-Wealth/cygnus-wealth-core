@@ -15,7 +15,7 @@ import {
   Stat
 } from '@chakra-ui/react';
 import { Link } from 'react-router-dom';
-import { FiChevronLeft, FiChevronRight, FiPlus } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiPlus, FiEye, FiEyeOff } from 'react-icons/fi';
 import { useStore } from '../store/useStore';
 import { useAccountSync } from '../hooks/useAccountSync';
 
@@ -23,6 +23,7 @@ const ITEMS_PER_PAGE = 10;
 
 export default function Dashboard() {
   const [currentPage, setCurrentPage] = useState(1);
+  const [showZeroBalances, setShowZeroBalances] = useState(false);
   
   // Get data from global store
   const { 
@@ -38,11 +39,22 @@ export default function Dashboard() {
   // Get connected accounts count
   const connectedAccounts = accounts.filter(acc => acc.status === 'connected').length;
 
+  // Filter assets based on zero balance preference
+  const filteredAssets = showZeroBalances 
+    ? assets 
+    : assets.filter(asset => parseFloat(asset.balance) > 0);
+
   // Pagination calculations
-  const totalPages = Math.ceil(assets.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(filteredAssets.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
-  const currentAssets = assets.slice(startIndex, endIndex);
+  const currentAssets = filteredAssets.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filter changes
+  const handleZeroBalanceChange = (checked: boolean) => {
+    setShowZeroBalances(checked);
+    setCurrentPage(1);
+  };
 
   return (
     <Container maxW="container.xl" py={8}>
@@ -102,7 +114,26 @@ export default function Dashboard() {
               <Heading as="h2" size="lg" color="gray.800">
                 Assets
               </Heading>
-              {isLoading && <Spinner size="sm" color="blue.500" />}
+              <Flex align="center" gap={4}>
+                <Flex align="center" gap={2}>
+                  <Box as={showZeroBalances ? FiEye : FiEyeOff} color="gray.600" />
+                  <Text fontSize="sm" color="gray.600">
+                    Show zero balances
+                  </Text>
+                  <input
+                    type="checkbox"
+                    checked={showZeroBalances}
+                    onChange={(e) => handleZeroBalanceChange(e.target.checked)}
+                    style={{
+                      marginLeft: '8px',
+                      cursor: 'pointer',
+                      width: '16px',
+                      height: '16px'
+                    }}
+                  />
+                </Flex>
+                {isLoading && <Spinner size="sm" color="blue.500" />}
+              </Flex>
             </Box>
 
             <Box overflowX="auto" position="relative" minH="300px">
@@ -118,7 +149,7 @@ export default function Dashboard() {
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {assets.length > 0 ? (
+                  {filteredAssets.length > 0 ? (
                     currentAssets.map((asset) => (
                       <Table.Row key={asset.id}>
                         <Table.Cell>
@@ -186,7 +217,12 @@ export default function Dashboard() {
             {totalPages > 1 && (
               <Flex justify="space-between" align="center" mt={4}>
                 <Text fontSize="sm" color="gray.600">
-                  Showing {startIndex + 1}-{Math.min(endIndex, assets.length)} of {assets.length} assets
+                  Showing {startIndex + 1}-{Math.min(endIndex, filteredAssets.length)} of {filteredAssets.length} assets
+                  {!showZeroBalances && assets.length > filteredAssets.length && (
+                    <Text as="span" color="gray.500">
+                      {' '}({assets.length - filteredAssets.length} hidden)
+                    </Text>
+                  )}
                 </Text>
                 <Stack direction="row" spacing={2}>
                   <IconButton

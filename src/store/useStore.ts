@@ -2,6 +2,14 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Balance } from '@cygnus-wealth/data-models';
 
+export interface Token {
+  address: string;
+  symbol: string;
+  name: string;
+  decimals: number;
+  chainId: number;
+}
+
 export interface Account {
   id: string;
   type: 'wallet' | 'cex' | 'dex';
@@ -12,6 +20,7 @@ export interface Account {
   status: 'connected' | 'disconnected' | 'error';
   lastSync?: string;
   balances?: Balance[];
+  tokens?: Token[]; // ERC20 tokens to track
 }
 
 export interface Asset {

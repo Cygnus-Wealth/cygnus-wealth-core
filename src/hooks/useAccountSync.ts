@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { createPublicClient, http, formatEther, type Address } from 'viem';
+import { createPublicClient, http, formatEther, type Address, erc20Abi } from 'viem';
 import { mainnet, polygon, arbitrum, optimism } from 'viem/chains';
 import { AssetValuator } from '@cygnus-wealth/asset-valuator';
 import { formatBalance } from '../utils/formatters';
-import type { Asset } from '../store/useStore';
+import type { Asset, Token } from '../store/useStore';
 
 const assetValuator = new AssetValuator();
 
@@ -80,6 +80,67 @@ export function useAccountSync() {
           };
           
           allAssets.push(asset);
+
+          // Fetch ERC20 token balances if any tokens are configured
+          if (account.tokens && account.tokens.length > 0) {
+            for (const token of account.tokens) {
+              try {
+                // Ensure token is for the correct chain
+                if (token.chainId !== chainConfig.chainId) continue;
+
+                // Fetch token balance
+                const tokenBalance = await client.readContract({
+                  address: token.address as Address,
+                  abi: erc20Abi,
+                  functionName: 'balanceOf',
+                  args: [account.address as Address]
+                });
+
+                // Check if balance is zero
+                const isZeroBalance = tokenBalance === 0n;
+
+                // Get token price - skip for zero balance tokens
+                let tokenPrice = null;
+                let tokenValueUsd = null;
+                
+                if (!isZeroBalance) {
+                  try {
+                    const tokenPriceData = await assetValuator.getPrice(token.symbol, 'USD');
+                    tokenPrice = tokenPriceData.price;
+                    updatePrice(token.symbol, tokenPrice);
+                    
+                    // Calculate value
+                    const tokenBalanceFormatted = formatBalance(tokenBalance.toString(), token.decimals);
+                    tokenValueUsd = parseFloat(tokenBalanceFormatted) * tokenPrice;
+                  } catch (priceError) {
+                    console.warn(`Price not available for ${token.symbol}. You may need to update the token symbol mapping in asset-valuator.`);
+                    console.debug('Price fetch error:', priceError);
+                  }
+                } else {
+                  // For zero balance tokens, set price and value to 0
+                  tokenPrice = 0;
+                  tokenValueUsd = 0;
+                }
+
+                // Create token asset entry
+                const tokenAsset: Asset = {
+                  id: `${account.id}-${token.symbol}-${token.address}`,
+                  symbol: token.symbol,
+                  name: token.name,
+                  balance: formatBalance(tokenBalance.toString(), token.decimals),
+                  source: account.label,
+                  chain: account.platform,
+                  accountId: account.id,
+                  priceUsd: tokenPrice,
+                  valueUsd: tokenValueUsd
+                };
+                
+                allAssets.push(tokenAsset);
+              } catch (tokenError) {
+                console.error(`Failed to fetch balance for token ${token.symbol}:`, tokenError);
+              }
+            }
+          }
 
           updateAccount(account.id, { 
             lastSync: new Date().toISOString(),
