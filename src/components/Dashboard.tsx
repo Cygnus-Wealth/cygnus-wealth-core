@@ -48,6 +48,7 @@ export default function Dashboard() {
       addresses: Set<string>;
       totalBalance: number;
       totalValue: number;
+      accountInfo?: { accountCount: number; walletType: string };
     }>();
 
     assets.forEach(asset => {
@@ -64,6 +65,11 @@ export default function Dashboard() {
         existing.asset.balance = existing.totalBalance.toString();
         existing.asset.valueUsd = existing.totalValue;
       } else {
+        // Get the account to check if it's multi-account
+        const account = accounts.find(acc => acc.id === asset.accountId);
+        const accountCount = account?.metadata?.accountCount || existing?.addresses.size || 1;
+        const walletType = account?.metadata?.walletType || 'Wallet';
+        
         assetMap.set(key, {
           asset: {
             ...asset,
@@ -72,13 +78,14 @@ export default function Dashboard() {
           },
           addresses: new Set([address]),
           totalBalance: balance,
-          totalValue: value
+          totalValue: value,
+          accountInfo: { accountCount, walletType }
         });
       }
     });
 
     return Array.from(assetMap.values());
-  }, [assets]);
+  }, [assets, accounts]);
 
   // Filter assets based on zero balance preference
   const filteredAssets = showZeroBalances 
@@ -192,9 +199,14 @@ export default function Dashboard() {
                 <Table.Body>
                   {filteredAssets.length > 0 ? (
                     currentAssets.map((item) => {
-                      const { asset, addresses } = item;
+                      const { asset, addresses, accountInfo } = item;
                       const addressArray = Array.from(addresses);
                       const showTooltip = addressArray.length > 1;
+                      
+                      // Format source to show account count
+                      const sourceLabel = accountInfo && addressArray.length > 1
+                        ? `${accountInfo.walletType} (${addressArray.length} accounts)`
+                        : asset.source;
                       
                       return (
                         <Table.Row key={asset.id}>
@@ -217,7 +229,7 @@ export default function Dashboard() {
                                     cursor="pointer"
                                     style={{ textDecoration: 'underline dotted' }}
                                   >
-                                    {asset.source}
+                                    {sourceLabel}
                                   </Badge>
                                 </Tooltip.Trigger>
                                 <Tooltip.Positioner>
@@ -237,7 +249,7 @@ export default function Dashboard() {
                               </Tooltip.Root>
                             ) : (
                               <Badge colorScheme="blue" variant="subtle">
-                                {asset.source}
+                                {sourceLabel}
                               </Badge>
                             )}
                           </Table.Cell>

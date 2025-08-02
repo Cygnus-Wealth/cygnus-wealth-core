@@ -211,7 +211,7 @@ export default function MultiWalletConnect() {
         
         toaster.create({
           title: 'Wallet Connected',
-          description: `Connected ${wallet.name} with ${configuredChains.length} configured chains`,
+          description: `Connected ${accounts.length} ${wallet.name} account${accounts.length > 1 ? 's' : ''} across ${configuredChains.length} chain${configuredChains.length > 1 ? 's' : ''}`,
           type: 'success',
           duration: 5000,
         });
