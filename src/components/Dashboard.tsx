@@ -41,45 +41,56 @@ export default function Dashboard() {
   // Get connected accounts count
   const connectedAccounts = accounts.filter(acc => acc.status === 'connected').length;
 
-  // Aggregate assets by symbol and chain
+  // Aggregate assets by symbol and chain, grouping by connection type
   const aggregatedAssets = useMemo(() => {
     const assetMap = new Map<string, {
       asset: Asset;
       addresses: Set<string>;
       totalBalance: number;
       totalValue: number;
-      accountInfo?: { accountCount: number; walletType: string };
+      connectionInfo: { 
+        connectionType: string; 
+        accountCount: number; 
+        walletIds: Set<string>;
+      };
     }>();
 
+    // Group assets by symbol, chain, and connection type
     assets.forEach(asset => {
-      const key = `${asset.symbol}-${asset.chain}`;
+      const account = accounts.find(acc => acc.id === asset.accountId);
+      const connectionType = account?.metadata?.connectionType || account?.metadata?.walletType || 'Unknown';
+      const walletId = account?.metadata?.walletId || account?.id || '';
+      
+      const key = `${asset.symbol}-${asset.chain}-${connectionType}`;
       const existing = assetMap.get(key);
       const balance = parseFloat(asset.balance);
       const value = asset.valueUsd || 0;
-      const address = asset.metadata?.address || '';
+      const address = asset.metadata?.address || account?.address || '';
 
       if (existing) {
         existing.addresses.add(address);
+        existing.walletIds.add(walletId);
         existing.totalBalance += balance;
         existing.totalValue += value;
         existing.asset.balance = existing.totalBalance.toString();
         existing.asset.valueUsd = existing.totalValue;
+        existing.connectionInfo.accountCount = existing.addresses.size;
       } else {
-        // Get the account to check if it's multi-account
-        const account = accounts.find(acc => acc.id === asset.accountId);
-        const accountCount = account?.metadata?.accountCount || 1;
-        const walletType = account?.metadata?.walletType || 'Wallet';
-        
         assetMap.set(key, {
           asset: {
             ...asset,
             balance: balance.toString(),
-            valueUsd: value
+            valueUsd: value,
+            source: connectionType // Update source to show connection type
           },
           addresses: new Set([address]),
           totalBalance: balance,
           totalValue: value,
-          accountInfo: { accountCount, walletType }
+          connectionInfo: { 
+            connectionType,
+            accountCount: 1,
+            walletIds: new Set([walletId])
+          }
         });
       }
     });
@@ -199,14 +210,14 @@ export default function Dashboard() {
                 <Table.Body>
                   {filteredAssets.length > 0 ? (
                     currentAssets.map((item) => {
-                      const { asset, addresses, accountInfo } = item;
+                      const { asset, addresses, connectionInfo } = item;
                       const addressArray = Array.from(addresses);
                       const showTooltip = addressArray.length > 1;
                       
                       // Format source to show account count
-                      const sourceLabel = accountInfo && addressArray.length > 1
-                        ? `${accountInfo.walletType} (${addressArray.length} accounts)`
-                        : asset.source;
+                      const sourceLabel = connectionInfo.accountCount > 1
+                        ? `${connectionInfo.connectionType} (${connectionInfo.accountCount} accounts)`
+                        : connectionInfo.connectionType;
                       
                       return (
                         <Table.Row key={asset.id}>

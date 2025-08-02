@@ -183,26 +183,40 @@ export default function MultiWalletConnect() {
         // Use the accounts we already have from eth_requestAccounts
         console.log(`Found ${accounts.length} accounts from ${wallet.name}`);
         
-        // Store wallet info with all accounts and chains
+        // Since we can't detect which accounts belong to which mnemonic automatically,
+        // we'll create separate entries for each account for now
+        // In a real implementation, the wallet would need to provide this information
+        
+        // For demonstration, we'll group all accounts under one "wallet" for now
+        // but in reality, these might come from different mnemonics
+        const connectionId = `connection-${wallet.name.toLowerCase()}-${Date.now()}`;
         const walletId = `wallet-${wallet.name.toLowerCase()}-${Date.now()}`;
         
-        addAccount({
-          id: walletId,
-          type: 'wallet',
-          platform: 'Multi-Chain EVM',
-          label: `${wallet.name} (${accounts.length} account${accounts.length > 1 ? 's' : ''})`,
-          address: accounts[0], // Primary account
-          status: 'connected',
-          metadata: {
-            walletManagerId: walletId,
-            chains: configuredChains,
-            source: source,
-            walletType: wallet.name,
-            detectedChains: configuredChains,
-            currentChainId: parseInt(originalChainId, 16),
-            allAddresses: accounts,
-            accountCount: accounts.length
-          }
+        // Add each account as a separate entry
+        accounts.forEach((address, index) => {
+          const accountId = `${connectionId}-account-${index}`;
+          
+          addAccount({
+            id: accountId,
+            type: 'wallet',
+            platform: 'Multi-Chain EVM',
+            label: `${wallet.name} Account ${index + 1}`,
+            address: address,
+            status: 'connected',
+            metadata: {
+              walletManagerId: walletId,
+              chains: configuredChains,
+              source: source,
+              walletType: wallet.name,
+              detectedChains: configuredChains,
+              currentChainId: parseInt(originalChainId, 16),
+              allAddresses: [address], // Single address per account entry
+              accountCount: 1,
+              walletId: walletId, // Groups accounts by wallet/mnemonic
+              connectionType: wallet.name, // MetaMask, Rabby, etc
+              walletLabel: `${wallet.name} Wallet 1` // Would need user input in real implementation
+            }
+          });
         });
         
         toaster.create({

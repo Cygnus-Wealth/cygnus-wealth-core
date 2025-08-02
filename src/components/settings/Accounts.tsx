@@ -140,8 +140,12 @@ export default function Accounts() {
                   Wallet Overview
                 </Text>
                 <Text fontSize="lg" color="blue.900">
-                  {accounts.filter(acc => acc.type === 'wallet').length} wallet{accounts.filter(acc => acc.type === 'wallet').length !== 1 ? 's' : ''} • {' '}
-                  {accounts.reduce((total, acc) => total + (acc.metadata?.accountCount || 1), 0)} total account{accounts.reduce((total, acc) => total + (acc.metadata?.accountCount || 1), 0) !== 1 ? 's' : ''}
+                  {/* Count unique connections */}
+                  {new Set(accounts.filter(acc => acc.type === 'wallet').map(acc => acc.metadata?.connectionType || acc.metadata?.walletType)).size} connection{new Set(accounts.filter(acc => acc.type === 'wallet').map(acc => acc.metadata?.connectionType || acc.metadata?.walletType)).size !== 1 ? 's' : ''} • {' '}
+                  {/* Count unique wallets */}
+                  {new Set(accounts.filter(acc => acc.type === 'wallet').map(acc => acc.metadata?.walletId)).size} wallet{new Set(accounts.filter(acc => acc.type === 'wallet').map(acc => acc.metadata?.walletId)).size !== 1 ? 's' : ''} • {' '}
+                  {/* Count total accounts */}
+                  {accounts.filter(acc => acc.type === 'wallet').length} account{accounts.filter(acc => acc.type === 'wallet').length !== 1 ? 's' : ''}
                 </Text>
               </Box>
               <Box color="blue.600">
@@ -206,7 +210,7 @@ export default function Accounts() {
                           </Badge>
                         </Flex>
                         <Text fontSize="sm" color="gray.600">
-                          {account.platform} • {getAccountTypeLabel(account.type)}
+                          {account.metadata?.connectionType || account.metadata?.walletType || account.platform} • {getAccountTypeLabel(account.type)}
                         </Text>
                       </Box>
                     </Flex>
@@ -260,14 +264,14 @@ export default function Accounts() {
                       </Text>
                     )}
                     
-                    {/* Show connected chains for multi-chain wallets */}
-                    {account.platform === 'Multi-Chain EVM' && account.metadata?.chains && (
+                    {/* Show connected chains */}
+                    {account.metadata?.detectedChains && account.metadata.detectedChains.length > 0 && (
                       <Box>
                         <Text fontSize="sm" color="gray.600" mb={1}>
                           Connected chains:
                         </Text>
                         <Flex gap={1} flexWrap="wrap">
-                          {account.metadata.chains.map((chain) => (
+                          {account.metadata.detectedChains.map((chain) => (
                             <Badge key={chain} size="sm" colorScheme="blue">
                               {chain}
                             </Badge>

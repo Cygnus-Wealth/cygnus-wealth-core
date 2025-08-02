@@ -21,25 +21,67 @@ const platformIcons: Record<string, React.ElementType> = {
   'Multi-Chain EVM': SiEthereum,
 };
 
+// Helper to abbreviate address
+const abbreviateAddress = (address: string) => 
+  address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '-';
+
+interface WalletGroup {
+  walletId: string;
+  walletLabel: string;
+  accounts: any[]; // Will be Account[] from store
+}
+
+interface ConnectionGroup {
+  connectionType: string;
+  wallets: WalletGroup[];
+  totalAccounts: number;
+}
+
 export default function WalletDetails() {
   const { accounts } = useStore();
   
   // Filter only wallet accounts
   const walletAccounts = accounts.filter(acc => acc.type === 'wallet');
   
-  // Group accounts by wallet type
-  const walletGroups = walletAccounts.reduce((groups, account) => {
-    const walletType = account.metadata?.walletType || 'Unknown';
-    if (!groups[walletType]) {
-      groups[walletType] = [];
+  // Group accounts by connection type (MetaMask, Rabby, etc) and then by wallet (mnemonic)
+  const connectionGroups = walletAccounts.reduce((groups, account) => {
+    const connectionType = account.metadata?.connectionType || account.metadata?.walletType || 'Unknown';
+    const walletId = account.metadata?.walletId || account.id; // Fallback to account id if no walletId
+    const walletLabel = account.metadata?.walletLabel || `${connectionType} Wallet`;
+    
+    // Find or create connection group
+    let connectionGroup = groups.find(g => g.connectionType === connectionType);
+    if (!connectionGroup) {
+      connectionGroup = {
+        connectionType,
+        wallets: [],
+        totalAccounts: 0
+      };
+      groups.push(connectionGroup);
     }
-    groups[walletType].push(account);
+    
+    // Find or create wallet group within connection
+    let walletGroup = connectionGroup.wallets.find(w => w.walletId === walletId);
+    if (!walletGroup) {
+      walletGroup = {
+        walletId,
+        walletLabel,
+        accounts: []
+      };
+      connectionGroup.wallets.push(walletGroup);
+    }
+    
+    // Add account to wallet group
+    walletGroup.accounts.push(account);
+    connectionGroup.totalAccounts++;
+    
     return groups;
-  }, {} as Record<string, typeof walletAccounts>);
+  }, [] as ConnectionGroup[]);
   
   // Calculate totals
-  const totalWallets = Object.keys(walletGroups).length;
-  const totalAccounts = walletAccounts.reduce((sum, acc) => sum + (acc.metadata?.accountCount || 1), 0);
+  const totalConnections = connectionGroups.length;
+  const totalWallets = connectionGroups.reduce((sum, conn) => sum + conn.wallets.length, 0);
+  const totalAccounts = walletAccounts.length;
   
   return (
     <Container maxW="container.xl" py={8}>
@@ -60,18 +102,17 @@ export default function WalletDetails() {
             </Heading>
           </Flex>
           <Text color="gray.600" ml={12}>
-            {totalWallets} wallet{totalWallets !== 1 ? 's' : ''} • {totalAccounts} total account{totalAccounts !== 1 ? 's' : ''}
+            {totalConnections} connection{totalConnections !== 1 ? 's' : ''} • {totalWallets} wallet{totalWallets !== 1 ? 's' : ''} • {totalAccounts} account{totalAccounts !== 1 ? 's' : ''}
           </Text>
         </Box>
 
-        {/* Wallet Groups */}
-        <Accordion.Root multiple defaultValue={Object.keys(walletGroups)}>
-          {Object.entries(walletGroups).map(([walletType, accounts]) => {
+        {/* Connection Groups */}
+        <Accordion.Root multiple defaultValue={connectionGroups.map(g => g.connectionType)}>
+          {connectionGroups.map((connectionGroup) => {
             const Icon = platformIcons['Multi-Chain EVM'] || SiEthereum;
-            const totalAccountsInWallet = accounts.reduce((sum, acc) => sum + (acc.metadata?.accountCount || 1), 0);
             
             return (
-              <Accordion.Item key={walletType} value={walletType} mb={4}>
+              <Accordion.Item key={connectionGroup.connectionType} value={connectionGroup.connectionType} mb={4}>
                 <Accordion.ItemTrigger
                   bg="white"
                   border="1px solid"
@@ -92,10 +133,10 @@ export default function WalletDetails() {
                     </Box>
                     <Box textAlign="left">
                       <Text fontWeight="semibold" fontSize="lg">
-                        {walletType}
+                        {connectionGroup.connectionType}
                       </Text>
                       <Text fontSize="sm" color="gray.600">
-                        {accounts.length} connection{accounts.length !== 1 ? 's' : ''} • {totalAccountsInWallet} account{totalAccountsInWallet !== 1 ? 's' : ''}
+                        {connectionGroup.wallets.length} wallet{connectionGroup.wallets.length !== 1 ? 's' : ''} • {connectionGroup.totalAccounts} account{connectionGroup.totalAccounts !== 1 ? 's' : ''}
                       </Text>
                     </Box>
                   </Flex>
@@ -109,57 +150,93 @@ export default function WalletDetails() {
                     borderTop="none"
                     borderColor="gray.200"
                     borderBottomRadius="lg"
-                    overflow="hidden"
+                    p={4}
                   >
-                    <Table.Root variant="line">
-                      <Table.Header>
-                        <Table.Row>
-                          <Table.ColumnHeader>Connection Label</Table.ColumnHeader>
-                          <Table.ColumnHeader>Status</Table.ColumnHeader>
-                          <Table.ColumnHeader>Chains</Table.ColumnHeader>
-                          <Table.ColumnHeader>Accounts</Table.ColumnHeader>
-                          <Table.ColumnHeader>Addresses</Table.ColumnHeader>
-                        </Table.Row>
-                      </Table.Header>
-                      <Table.Body>
-                        {accounts.map((account) => (
-                          <Table.Row key={account.id}>
-                            <Table.Cell>{account.label}</Table.Cell>
-                            <Table.Cell>
-                              <Badge
-                                colorScheme={
-                                  account.status === 'connected' ? 'green' :
-                                  account.status === 'error' ? 'red' : 'gray'
-                                }
-                              >
-                                {account.status}
-                              </Badge>
-                            </Table.Cell>
-                            <Table.Cell>
-                              <Flex gap={1} flexWrap="wrap">
-                                {(account.metadata?.detectedChains || []).map((chain) => (
-                                  <Badge key={chain} size="sm" colorScheme="purple">
-                                    {chain}
-                                  </Badge>
-                                ))}
-                              </Flex>
-                            </Table.Cell>
-                            <Table.Cell>
-                              {account.metadata?.accountCount || 1}
-                            </Table.Cell>
-                            <Table.Cell>
-                              <Stack gap={1}>
-                                {(account.metadata?.allAddresses || [account.address]).map((addr, idx) => (
-                                  <Text key={idx} fontSize="xs" fontFamily="mono">
-                                    {addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : '-'}
-                                  </Text>
-                                ))}
-                              </Stack>
-                            </Table.Cell>
-                          </Table.Row>
-                        ))}
-                      </Table.Body>
-                    </Table.Root>
+                    {/* Wallets within this connection */}
+                    <Accordion.Root multiple defaultValue={connectionGroup.wallets.map(w => w.walletId)}>
+                      {connectionGroup.wallets.map((walletGroup) => (
+                        <Accordion.Item key={walletGroup.walletId} value={walletGroup.walletId} mb={3}>
+                          <Accordion.ItemTrigger
+                            bg="gray.50"
+                            border="1px solid"
+                            borderColor="gray.200"
+                            borderRadius="md"
+                            p={3}
+                            _hover={{ bg: 'gray.100' }}
+                            _expanded={{ bg: 'gray.100', borderBottomRadius: 0 }}
+                          >
+                            <Flex flex="1" align="center" gap={3}>
+                              <Box textAlign="left">
+                                <Text fontWeight="medium">
+                                  {walletGroup.walletLabel}
+                                </Text>
+                                <Text fontSize="sm" color="gray.600">
+                                  {walletGroup.accounts.length} account{walletGroup.accounts.length !== 1 ? 's' : ''}
+                                </Text>
+                              </Box>
+                            </Flex>
+                            <Accordion.ItemIndicator />
+                          </Accordion.ItemTrigger>
+                          
+                          <Accordion.ItemContent>
+                            <Box
+                              bg="white"
+                              border="1px solid"
+                              borderTop="none"
+                              borderColor="gray.200"
+                              borderBottomRadius="md"
+                              overflow="hidden"
+                            >
+                              <Table.Root variant="line" size="sm">
+                                <Table.Header>
+                                  <Table.Row>
+                                    <Table.ColumnHeader>Account</Table.ColumnHeader>
+                                    <Table.ColumnHeader>Address</Table.ColumnHeader>
+                                    <Table.ColumnHeader>Status</Table.ColumnHeader>
+                                    <Table.ColumnHeader>Chains</Table.ColumnHeader>
+                                  </Table.Row>
+                                </Table.Header>
+                                <Table.Body>
+                                  {walletGroup.accounts.map((account) => (
+                                    <Table.Row key={account.id}>
+                                      <Table.Cell>{account.label}</Table.Cell>
+                                      <Table.Cell fontFamily="mono">
+                                        {abbreviateAddress(account.address || '')}
+                                      </Table.Cell>
+                                      <Table.Cell>
+                                        <Badge
+                                          size="sm"
+                                          colorScheme={
+                                            account.status === 'connected' ? 'green' :
+                                            account.status === 'error' ? 'red' : 'gray'
+                                          }
+                                        >
+                                          {account.status}
+                                        </Badge>
+                                      </Table.Cell>
+                                      <Table.Cell>
+                                        <Flex gap={1} flexWrap="wrap">
+                                          {(account.metadata?.detectedChains || []).slice(0, 3).map((chain) => (
+                                            <Badge key={chain} size="sm" colorScheme="purple">
+                                              {chain}
+                                            </Badge>
+                                          ))}
+                                          {(account.metadata?.detectedChains || []).length > 3 && (
+                                            <Badge size="sm" colorScheme="gray">
+                                              +{(account.metadata?.detectedChains || []).length - 3}
+                                            </Badge>
+                                          )}
+                                        </Flex>
+                                      </Table.Cell>
+                                    </Table.Row>
+                                  ))}
+                                </Table.Body>
+                              </Table.Root>
+                            </Box>
+                          </Accordion.ItemContent>
+                        </Accordion.Item>
+                      ))}
+                    </Accordion.Root>
                   </Box>
                 </Accordion.ItemContent>
               </Accordion.Item>
@@ -178,6 +255,22 @@ export default function WalletDetails() {
             </Text>
           </Box>
         )}
+        
+        {/* Info Box */}
+        <Box
+          p={4}
+          bg="blue.50"
+          borderRadius="md"
+          border="1px solid"
+          borderColor="blue.200"
+        >
+          <Text fontSize="sm" color="blue.800">
+            <strong>Note:</strong> Each connection (MetaMask, Rabby, etc.) can contain multiple wallets 
+            (different mnemonics or hardware devices), and each wallet can have multiple accounts (addresses). 
+            Currently, wallet grouping is estimated as most wallet extensions don't expose which accounts 
+            belong to which mnemonic.
+          </Text>
+        </Box>
       </Stack>
     </Container>
   );

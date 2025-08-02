@@ -31,6 +31,9 @@ export interface Account {
     allAddresses?: string[];
     accountCount?: number;
     useWalletManager?: boolean;
+    walletId?: string; // Groups accounts by mnemonic/seed phrase
+    connectionType?: string; // MetaMask, Rabby, etc
+    walletLabel?: string; // User-friendly label for the wallet/mnemonic
   };
 }
 
