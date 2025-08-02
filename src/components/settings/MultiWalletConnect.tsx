@@ -200,21 +200,14 @@ export default function MultiWalletConnect() {
           }
         });
         
-        // Create a wallet manager instance specific to this provider
-        const specificWalletManager = new WalletManager();
-        
-        // Store both the provider and wallet manager for this specific wallet
-        if (!(window as any).__walletManagers) {
-          (window as any).__walletManagers = {};
+        // Store the configured chains in the window for immediate use
+        if (!(window as any).__walletData) {
+          (window as any).__walletData = {};
         }
-        (window as any).__walletManagers[wallet.name.toLowerCase()] = {
-          provider: provider,
-          walletManager: specificWalletManager,
-          configuredChains: configuredChains
+        (window as any).__walletData[wallet.name.toLowerCase()] = {
+          configuredChains: configuredChains,
+          walletType: wallet.name
         };
-        
-        // Set default for compatibility
-        (window as any).__walletManager = specificWalletManager;
         
         toaster.create({
           title: 'Wallet Connected',

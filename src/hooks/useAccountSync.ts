@@ -55,16 +55,13 @@ export function useAccountSync() {
         try {
           // Check if this is a multi-chain wallet
           if (account.platform === 'Multi-Chain EVM' && account.metadata?.walletManagerId) {
-            // Get the specific wallet manager for this wallet
-            const walletManagers = (window as any).__walletManagers;
-            const walletData = walletManagers?.[account.metadata.walletManagerId];
+            // Use configured chains from account metadata
+            let configuredChains = account.metadata?.detectedChains || account.metadata?.chains || [];
             
-            if (!walletData) {
-              console.error('WalletManager not found for', account.metadata.walletManagerId);
-              continue;
+            if (configuredChains.length === 0) {
+              console.warn(`No configured chains found for ${account.label}, using Ethereum as default`);
+              configuredChains = ['Ethereum'];
             }
-
-            const { configuredChains } = walletData;
             
             // Get all addresses to check (primary + any additional)
             const addressesToCheck = account.metadata?.allAddresses || [account.address];
