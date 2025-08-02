@@ -4,8 +4,7 @@ import { createPublicClient, http, formatEther, type Address, erc20Abi } from 'v
 import { mainnet, polygon, arbitrum, optimism } from 'viem/chains';
 import { AssetValuator } from '@cygnus-wealth/asset-valuator';
 import { formatBalance } from '../utils/formatters';
-import type { Asset, Token } from '../store/useStore';
-import type { WalletBalance } from '@cygnus-wealth/wallet-integration-system';
+import type { Asset } from '../store/useStore';
 
 const assetValuator = new AssetValuator();
 
@@ -15,12 +14,14 @@ const chainMap: Record<string, any> = {
   'Polygon': { chain: polygon, chainId: 137, symbol: 'MATIC', name: 'Polygon' },
   'Arbitrum': { chain: arbitrum, chainId: 42161, symbol: 'ETH', name: 'Arbitrum ETH' },
   'Optimism': { chain: optimism, chainId: 10, symbol: 'ETH', name: 'Optimism ETH' },
+  'BSC': { chain: mainnet, chainId: 56, symbol: 'BNB', name: 'BNB' },
+  'Avalanche': { chain: mainnet, chainId: 43114, symbol: 'AVAX', name: 'Avalanche' },
+  'Base': { chain: mainnet, chainId: 8453, symbol: 'ETH', name: 'Base ETH' },
+  // Legacy uppercase names for compatibility
   'ETHEREUM': { chain: mainnet, chainId: 1, symbol: 'ETH', name: 'Ethereum' },
   'POLYGON': { chain: polygon, chainId: 137, symbol: 'MATIC', name: 'Polygon' },
   'ARBITRUM': { chain: arbitrum, chainId: 42161, symbol: 'ETH', name: 'Arbitrum ETH' },
   'OPTIMISM': { chain: optimism, chainId: 10, symbol: 'ETH', name: 'Optimism ETH' },
-  'BSC': { chain: mainnet, chainId: 56, symbol: 'BNB', name: 'BNB' }, // TODO: Add BSC chain from viem
-  'AVALANCHE': { chain: mainnet, chainId: 43114, symbol: 'AVAX', name: 'Avalanche' }, // TODO: Add Avalanche chain from viem
 };
 
 export function useAccountSync() {
@@ -54,58 +55,73 @@ export function useAccountSync() {
         try {
           // Check if this is a multi-chain wallet
           if (account.platform === 'Multi-Chain EVM' && account.metadata?.walletManagerId) {
-            // Use wallet-integration-system for multi-chain wallets
-            const walletManager = (window as any).__walletManager;
+            // Get the specific wallet manager for this wallet
+            const walletManagers = (window as any).__walletManagers;
+            const walletData = walletManagers?.[account.metadata.walletManagerId];
             
-            if (!walletManager) {
-              console.error('WalletManager not found');
+            if (!walletData) {
+              console.error('WalletManager not found for', account.metadata.walletManagerId);
               continue;
             }
 
-            // Get all balances from connected chains
-            const balances: WalletBalance[] = await walletManager.getAllBalances();
+            const { configuredChains } = walletData;
             
-            // Convert WalletBalance to Asset
-            for (const balance of balances) {
+            // Fetch balances from each configured chain using public RPC
+            const balancePromises = configuredChains.map(async (chainName: string) => {
               try {
-                // Skip zero balances
-                if (parseFloat(balance.amount) === 0) continue;
+                const chainConfig = chainMap[chainName];
+                if (!chainConfig) {
+                  console.warn(`No chain config for ${chainName}`);
+                  return null;
+                }
+                
+                // Create public client for the chain
+                const client = createPublicClient({
+                  chain: chainConfig.chain,
+                  transport: http()
+                });
 
-                // Get price
-                const priceData = await assetValuator.getPrice(balance.asset.symbol, 'USD');
-                updatePrice(balance.asset.symbol, priceData.price);
+                // Fetch balance
+                const balance = await client.getBalance({ 
+                  address: account.address as Address 
+                });
+                
+                // Skip zero balances
+                if (balance === 0n) return null;
+                
+                // Get native token price
+                let priceData = { price: 0 };
+                try {
+                  priceData = await assetValuator.getPrice(chainConfig.symbol, 'USD');
+                  updatePrice(chainConfig.symbol, priceData.price);
+                } catch (priceError) {
+                  console.warn(`Price not available for ${chainConfig.symbol}`);
+                }
                 
                 // Create asset entry
                 const asset: Asset = {
-                  id: `${account.id}-${balance.asset.symbol}-${balance.chain}`,
-                  symbol: balance.asset.symbol,
-                  name: balance.asset.name,
-                  balance: balance.amount,
+                  id: `${account.id}-${chainConfig.symbol}-${chainName}`,
+                  symbol: chainConfig.symbol,
+                  name: chainConfig.name,
+                  balance: formatBalance(balance.toString(), 18),
                   source: account.label,
-                  chain: balance.chain,
+                  chain: chainName,
                   accountId: account.id,
                   priceUsd: priceData.price,
-                  valueUsd: parseFloat(balance.amount) * priceData.price
+                  valueUsd: parseFloat(formatBalance(balance.toString(), 18)) * priceData.price
                 };
                 
-                allAssets.push(asset);
-              } catch (priceError) {
-                console.warn(`Price not available for ${balance.asset.symbol}`);
-                // Still add the asset without price
-                const asset: Asset = {
-                  id: `${account.id}-${balance.asset.symbol}-${balance.chain}`,
-                  symbol: balance.asset.symbol,
-                  name: balance.asset.name,
-                  balance: balance.amount,
-                  source: account.label,
-                  chain: balance.chain,
-                  accountId: account.id,
-                  priceUsd: null,
-                  valueUsd: null
-                };
-                allAssets.push(asset);
+                return asset;
+              } catch (error) {
+                console.error(`Error fetching balance for ${chainName}:`, error);
+                return null;
               }
-            }
+            });
+            
+            // Wait for all balance fetches to complete
+            const results = await Promise.all(balancePromises);
+            const validAssets = results.filter((asset): asset is Asset => asset !== null);
+            allAssets.push(...validAssets);
 
             updateAccount(account.id, { 
               lastSync: new Date().toISOString(),

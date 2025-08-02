@@ -136,55 +136,102 @@ export default function MultiWalletConnect() {
       
       const source = sourceMap[wallet.name] || IntegrationSource.METAMASK;
       
-      // Set the provider on window.ethereum temporarily for wallet-integration-system
-      const originalEthereum = window.ethereum;
-      window.ethereum = provider;
+      // First, let's detect which chains are configured in the wallet
+      const configuredChains: string[] = [];
+      const chainChecks = [
+        { chainId: '0x1', name: 'Ethereum' },
+        { chainId: '0x89', name: 'Polygon' },
+        { chainId: '0x38', name: 'BSC' },
+        { chainId: '0xa4b1', name: 'Arbitrum' },
+        { chainId: '0xa', name: 'Optimism' },
+        { chainId: '0xa86a', name: 'Avalanche' },
+        { chainId: '0x2105', name: 'Base' }
+      ];
+      
+      // Try to detect configured chains by attempting to switch to them
+      for (const chain of chainChecks) {
+        try {
+          await provider.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: chain.chainId }]
+          });
+          configuredChains.push(chain.name);
+          console.log(`Chain ${chain.name} is configured`);
+        } catch (error: any) {
+          if (error.code === 4902) {
+            // Chain not added to wallet
+            console.log(`Chain ${chain.name} is not configured`);
+          } else if (error.code === 4001) {
+            // User rejected - stop checking
+            throw new Error('User rejected chain switch');
+          }
+        }
+      }
+      
+      if (configuredChains.length === 0) {
+        // At least Ethereum should be available
+        configuredChains.push('Ethereum');
+      }
+      
+      // Get current chain to restore later
+      const originalChainId = await provider.request({ method: 'eth_chainId' });
       
       try {
-        // Use connectAllEVMChains to connect to all supported chains
-        if (typeof (walletManager as any).connectAllEVMChains === 'function') {
-          console.log('Using connectAllEVMChains method');
-          
-          const { connections, balances } = await (walletManager as any).connectAllEVMChains(source);
-          
-          if (connections.length === 0) {
-            throw new Error('No chains connected');
+        // For now, let's just connect to the current chain and show configured chains
+        const address = accounts[0];
+        
+        // Add account with configured chains info
+        addAccount({
+          id: `wallet-${wallet.name.toLowerCase()}-${Date.now()}`,
+          type: 'wallet',
+          platform: 'Multi-Chain EVM',
+          label: `${wallet.name} (${configuredChains.length} chains)`,
+          address: address,
+          status: 'connected',
+          metadata: {
+            walletManagerId: wallet.name.toLowerCase(),
+            chains: configuredChains,
+            source: source,
+            walletType: wallet.name,
+            detectedChains: configuredChains,
+            currentChainId: parseInt(originalChainId, 16)
           }
-          
-          // Get the address (same for all EVM chains)
-          const address = connections[0].address;
-          
-          // Add a single multi-chain wallet account
-          addAccount({
-            id: `wallet-${wallet.name.toLowerCase()}-${Date.now()}`,
-            type: 'wallet',
-            platform: 'Multi-Chain EVM',
-            label: `${wallet.name} (Multi-Chain)`,
-            address: address,
-            status: 'connected',
-            metadata: {
-              walletManagerId: 'default',
-              chains: connections.map((c: any) => c.chain),
-              source: source,
-              walletType: wallet.name
-            }
-          });
-          
-          // Store wallet manager instance globally for balance fetching
-          (window as any).__walletManager = walletManager;
-          
-          toaster.create({
-            title: 'Wallet Connected',
-            description: `Connected to ${connections.length} chains: ${address.slice(0, 6)}...${address.slice(-4)}`,
-            type: 'success',
-            duration: 5000,
-          });
-        } else {
-          throw new Error('Multi-chain connection not available');
+        });
+        
+        // Create a wallet manager instance specific to this provider
+        const specificWalletManager = new WalletManager();
+        
+        // Store both the provider and wallet manager for this specific wallet
+        if (!(window as any).__walletManagers) {
+          (window as any).__walletManagers = {};
         }
-      } finally {
-        // Restore original ethereum provider
-        window.ethereum = originalEthereum;
+        (window as any).__walletManagers[wallet.name.toLowerCase()] = {
+          provider: provider,
+          walletManager: specificWalletManager,
+          configuredChains: configuredChains
+        };
+        
+        // Set default for compatibility
+        (window as any).__walletManager = specificWalletManager;
+        
+        toaster.create({
+          title: 'Wallet Connected',
+          description: `Connected ${wallet.name} with ${configuredChains.length} configured chains`,
+          type: 'success',
+          duration: 5000,
+        });
+        
+        // Try to restore original chain
+        try {
+          await provider.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: originalChainId }]
+          });
+        } catch (e) {
+          console.error('Could not restore original chain:', e);
+        }
+      } catch (error) {
+        throw error;
       }
     } catch (error: any) {
       console.error('Connection error:', error);
