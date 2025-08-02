@@ -30,6 +30,7 @@ export interface Account {
     currentChainId?: number;
     allAddresses?: string[];
     accountCount?: number;
+    useWalletManager?: boolean;
   };
 }
 

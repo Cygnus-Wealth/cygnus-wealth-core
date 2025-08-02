@@ -177,41 +177,51 @@ export default function MultiWalletConnect() {
       const originalChainId = await provider.request({ method: 'eth_chainId' });
       
       try {
-        // Store all accounts
-        console.log(`Found ${accounts.length} accounts in ${wallet.name}`);
+        // Use wallet-integration-system to connect to all chains
+        console.log(`Connecting ${wallet.name} with wallet-integration-system...`);
         
-        // Add a single wallet entry that represents all accounts
+        // Store wallet manager globally for use in sync
+        if (!(window as any).__cygnusWalletManager) {
+          (window as any).__cygnusWalletManager = walletManager;
+        }
+        
+        // Connect to all EVM chains to get all accounts and balances
+        const result = await walletManager.connectAllEVMChains(source);
+        console.log('Connection result:', result);
+        
+        // Get all unique accounts from connections
+        const uniqueAddresses = new Set<string>();
+        result.connections.forEach(conn => uniqueAddresses.add(conn.address));
+        const allAccounts = Array.from(uniqueAddresses);
+        
+        console.log(`Found ${allAccounts.length} unique accounts across ${result.connections.length} chains`);
+        
+        // Store wallet info with all accounts and chains
+        const walletId = `wallet-${wallet.name.toLowerCase()}-${Date.now()}`;
+        
         addAccount({
-          id: `wallet-${wallet.name.toLowerCase()}-${Date.now()}`,
+          id: walletId,
           type: 'wallet',
           platform: 'Multi-Chain EVM',
-          label: `${wallet.name} (${accounts.length} accounts)`,
-          address: accounts[0], // Primary account
+          label: `${wallet.name} (${allAccounts.length} account${allAccounts.length > 1 ? 's' : ''})`,
+          address: allAccounts[0], // Primary account
           status: 'connected',
           metadata: {
-            walletManagerId: wallet.name.toLowerCase(),
+            walletManagerId: walletId,
             chains: configuredChains,
             source: source,
             walletType: wallet.name,
             detectedChains: configuredChains,
             currentChainId: parseInt(originalChainId, 16),
-            allAddresses: accounts, // Store all account addresses
-            accountCount: accounts.length
+            allAddresses: allAccounts,
+            accountCount: allAccounts.length,
+            useWalletManager: true // Flag to use new wallet manager approach
           }
         });
         
-        // Store the configured chains in the window for immediate use
-        if (!(window as any).__walletData) {
-          (window as any).__walletData = {};
-        }
-        (window as any).__walletData[wallet.name.toLowerCase()] = {
-          configuredChains: configuredChains,
-          walletType: wallet.name
-        };
-        
         toaster.create({
           title: 'Wallet Connected',
-          description: `Connected ${accounts.length} ${wallet.name} account${accounts.length > 1 ? 's' : ''} across ${configuredChains.length} chain${configuredChains.length > 1 ? 's' : ''}`,
+          description: `Connected ${allAccounts.length} ${wallet.name} account${allAccounts.length > 1 ? 's' : ''} across ${configuredChains.length} chain${configuredChains.length > 1 ? 's' : ''}`,
           type: 'success',
           duration: 5000,
         });

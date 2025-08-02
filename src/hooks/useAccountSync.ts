@@ -55,85 +55,150 @@ export function useAccountSync() {
         try {
           // Check if this is a multi-chain wallet
           if (account.platform === 'Multi-Chain EVM' && account.metadata?.walletManagerId) {
-            // Use configured chains from account metadata
-            let configuredChains = account.metadata?.detectedChains || account.metadata?.chains || [];
-            
-            if (configuredChains.length === 0) {
-              console.warn(`No configured chains found for ${account.label}, using Ethereum as default`);
-              configuredChains = ['Ethereum'];
-            }
-            
-            // Get all addresses to check (primary + any additional)
-            const addressesToCheck = account.metadata?.allAddresses || [account.address];
-            
-            // Fetch balances for all addresses from each configured chain
-            const balancePromises: Promise<Asset | null>[] = [];
-            
-            for (const address of addressesToCheck) {
-              for (const chainName of configuredChains) {
-                balancePromises.push(
-                  (async () => {
-                    try {
-                      const chainConfig = chainMap[chainName];
-                      if (!chainConfig) {
-                        console.warn(`No chain config for ${chainName}`);
-                        return null;
-                      }
-                      
-                      // Create public client for the chain
-                      const client = createPublicClient({
-                        chain: chainConfig.chain,
-                        transport: http()
-                      });
-
-                      // Fetch balance
-                      const balance = await client.getBalance({ 
-                        address: address as Address 
-                      });
-                      
+            // Check if we should use the new wallet manager approach
+            if (account.metadata?.useWalletManager && (window as any).__cygnusWalletManager) {
+              try {
+                const walletManager = (window as any).__cygnusWalletManager;
+                console.log('Using wallet manager for account sync');
+                
+                // Get all account balances from wallet manager
+                const allBalances = await walletManager.getAllAccountBalances();
+                console.log('All account balances:', allBalances);
+                
+                // Process balances for each wallet
+                for (const [, walletData] of Object.entries(allBalances as any)) {
+                  for (const [address, accountData] of Object.entries((walletData as any).balancesByAccount)) {
+                    const { balances } = accountData as any;
+                    
+                    // Process each balance
+                    for (const balance of balances) {
                       // Skip zero balances
-                      if (balance === 0n) return null;
+                      if (parseFloat(balance.amount) === 0) continue;
                       
-                      // Get native token price
+                      // Get chain name from enum
+                      const chainName = balance.chain;
+                      
+                      // Get price
                       let priceData = { price: 0 };
                       try {
-                        priceData = await assetValuator.getPrice(chainConfig.symbol, 'USD');
-                        updatePrice(chainConfig.symbol, priceData.price);
+                        priceData = await assetValuator.getPrice(balance.asset.symbol, 'USD');
+                        updatePrice(balance.asset.symbol, priceData.price);
                       } catch (priceError) {
-                        console.warn(`Price not available for ${chainConfig.symbol}`);
+                        console.warn(`Price not available for ${balance.asset.symbol}`);
                       }
                       
-                      // Create asset entry with address info
+                      // Create asset entry
                       const asset: Asset = {
-                        id: `${account.id}-${chainConfig.symbol}-${chainName}-${address}`,
-                        symbol: chainConfig.symbol,
-                        name: chainConfig.name,
-                        balance: formatBalance(balance.toString(), 18),
+                        id: `${account.id}-${balance.asset.symbol}-${chainName}-${address}`,
+                        symbol: balance.asset.symbol,
+                        name: balance.asset.name,
+                        balance: balance.amount,
                         source: account.label,
                         chain: chainName,
                         accountId: account.id,
                         priceUsd: priceData.price,
-                        valueUsd: parseFloat(formatBalance(balance.toString(), 18)) * priceData.price,
+                        valueUsd: parseFloat(balance.amount) * priceData.price,
                         metadata: {
                           address: address,
-                          isMultiAccount: addressesToCheck.length > 1
+                          isMultiAccount: true
                         }
                       };
                       
-                      return asset;
-                    } catch (error) {
-                      console.error(`Error fetching balance for ${chainName} - ${address}:`, error);
-                      return null;
+                      allAssets.push(asset);
                     }
-                  })()
-                );
+                  }
+                }
+              } catch (error) {
+                console.error('Error using wallet manager, falling back to manual fetch:', error);
+                // Fall back to manual fetching if wallet manager fails
+                await fetchBalancesManually();
               }
+            } else {
+              // Use manual fetching approach
+              await fetchBalancesManually();
             }
             
-            // Wait for all balance fetches to complete
-            const results = await Promise.all(balancePromises);
-            const validAssets = results.filter((asset): asset is Asset => asset !== null);
-            allAssets.push(...validAssets);
+            async function fetchBalancesManually() {
+              // Use configured chains from account metadata
+              let configuredChains = account.metadata?.detectedChains || account.metadata?.chains || [];
+              
+              if (configuredChains.length === 0) {
+                console.warn(`No configured chains found for ${account.label}, using Ethereum as default`);
+                configuredChains = ['Ethereum'];
+              }
+              
+              // Get all addresses to check (primary + any additional)
+              const addressesToCheck = account.metadata?.allAddresses || [account.address];
+              
+              // Fetch balances for all addresses from each configured chain
+              const balancePromises: Promise<Asset | null>[] = [];
+              
+              for (const address of addressesToCheck) {
+                for (const chainName of configuredChains) {
+                  balancePromises.push(
+                    (async () => {
+                      try {
+                        const chainConfig = chainMap[chainName];
+                        if (!chainConfig) {
+                          console.warn(`No chain config for ${chainName}`);
+                          return null;
+                        }
+                        
+                        // Create public client for the chain
+                        const client = createPublicClient({
+                          chain: chainConfig.chain,
+                          transport: http()
+                        });
+
+                        // Fetch balance
+                        const balance = await client.getBalance({ 
+                          address: address as Address 
+                        });
+                        
+                        // Skip zero balances
+                        if (balance === 0n) return null;
+                        
+                        // Get native token price
+                        let priceData = { price: 0 };
+                        try {
+                          priceData = await assetValuator.getPrice(chainConfig.symbol, 'USD');
+                          updatePrice(chainConfig.symbol, priceData.price);
+                        } catch (priceError) {
+                          console.warn(`Price not available for ${chainConfig.symbol}`);
+                        }
+                        
+                        // Create asset entry with address info
+                        const asset: Asset = {
+                          id: `${account.id}-${chainConfig.symbol}-${chainName}-${address}`,
+                          symbol: chainConfig.symbol,
+                          name: chainConfig.name,
+                          balance: formatBalance(balance.toString(), 18),
+                          source: account.label,
+                          chain: chainName,
+                          accountId: account.id,
+                          priceUsd: priceData.price,
+                          valueUsd: parseFloat(formatBalance(balance.toString(), 18)) * priceData.price,
+                          metadata: {
+                            address: address,
+                            isMultiAccount: addressesToCheck.length > 1
+                          }
+                        };
+                        
+                        return asset;
+                      } catch (error) {
+                        console.error(`Error fetching balance for ${chainName} - ${address}:`, error);
+                        return null;
+                      }
+                    })()
+                  );
+                }
+              }
+              
+              // Wait for all balance fetches to complete
+              const results = await Promise.all(balancePromises);
+              const validAssets = results.filter((asset): asset is Asset => asset !== null);
+              allAssets.push(...validAssets);
+            }
 
             updateAccount(account.id, { 
               lastSync: new Date().toISOString(),

@@ -67,7 +67,7 @@ export default function Dashboard() {
       } else {
         // Get the account to check if it's multi-account
         const account = accounts.find(acc => acc.id === asset.accountId);
-        const accountCount = account?.metadata?.accountCount || existing?.addresses.size || 1;
+        const accountCount = account?.metadata?.accountCount || 1;
         const walletType = account?.metadata?.walletType || 'Wallet';
         
         assetMap.set(key, {
