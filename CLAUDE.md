@@ -37,6 +37,7 @@ Primary goals include secure, effortless multi-chain tracking with high decentra
 - Test environment: jsdom 
 - Setup file: `./src/setupTests.ts` (referenced but not yet created)
 - Run tests: `vitest` (not explicitly in package.json scripts yet)
+- Never complete any task without ensuring tests are passing. 
 
 ## Tech Stack & Architecture
 

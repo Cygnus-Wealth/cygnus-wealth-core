@@ -21,6 +21,11 @@ export interface Account {
   lastSync?: string;
   balances?: Balance[];
   tokens?: Token[]; // ERC20 tokens to track
+  metadata?: {
+    walletManagerId?: string;
+    chains?: string[];
+    source?: string;
+  };
 }
 
 export interface Asset {

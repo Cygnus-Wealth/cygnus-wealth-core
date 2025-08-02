@@ -17,6 +17,8 @@ import { useStore } from '../../store/useStore';
 import { useState } from 'react';
 import AddAccountModal from './AddAccountModal';
 import TokenManager from './TokenManager';
+import MultiWalletConnect from './MultiWalletConnect';
+import WalletDiagnostics from './WalletDiagnostics';
 
 // Platform icon mapping
 const platformIcons: Record<string, React.ElementType> = {
@@ -99,16 +101,20 @@ export default function Accounts() {
           </Text>
         </Box>
 
-        {/* Add Account Button */}
+        {/* Add Account Actions */}
         <Box>
-          <Button
-            leftIcon={<FiPlus />}
-            colorScheme="blue"
-            size="lg"
-            onClick={handleAddAccount}
-          >
-            Add Account
-          </Button>
+          <Stack direction="row" spacing={4} wrap="wrap">
+            <MultiWalletConnect />
+            <Button
+              leftIcon={<FiPlus />}
+              variant="outline"
+              colorScheme="gray"
+              onClick={handleAddAccount}
+            >
+              Add Manually
+            </Button>
+            <WalletDiagnostics />
+          </Stack>
         </Box>
 
         {/* Accounts List */}
@@ -219,8 +225,10 @@ export default function Accounts() {
                     )}
                   </Stack>
 
-                  {/* Token Manager for wallet accounts */}
-                  {account.type === 'wallet' && account.status === 'connected' && (
+                  {/* Token Manager for single-chain wallet accounts only */}
+                  {account.type === 'wallet' && 
+                   account.status === 'connected' && 
+                   account.platform !== 'Multi-Chain EVM' && (
                     <Box pt={4} borderTop="1px solid" borderColor="gray.200">
                       <TokenManager accountId={account.id} platform={account.platform} />
                     </Box>
