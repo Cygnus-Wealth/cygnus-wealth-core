@@ -10,8 +10,8 @@ import {
   IconButton,
   Grid,
 } from '@chakra-ui/react';
-import { Link } from 'react-router-dom';
-import { FiArrowLeft, FiPlus, FiEdit2, FiTrash2, FiKey } from 'react-icons/fi';
+import { Link, useNavigate } from 'react-router-dom';
+import { FiArrowLeft, FiPlus, FiEdit2, FiTrash2, FiKey, FiChevronRight } from 'react-icons/fi';
 import { SiEthereum, SiSolana, SiBinance } from 'react-icons/si';
 import { useStore } from '../../store/useStore';
 import { useState } from 'react';
@@ -33,6 +33,7 @@ const platformIcons: Record<string, React.ElementType> = {
 export default function Accounts() {
   const { accounts, updateAccount, removeAccount } = useStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const navigate = useNavigate();
   
   const getStatusColor = (status: 'connected' | 'disconnected' | 'error') => {
     switch (status) {
@@ -116,6 +117,39 @@ export default function Accounts() {
             <WalletDiagnostics />
           </Stack>
         </Box>
+
+        {/* Summary Section */}
+        {accounts.length > 0 && (
+          <Box
+            p={4}
+            bg="blue.50"
+            borderRadius="lg"
+            border="1px solid"
+            borderColor="blue.200"
+            cursor="pointer"
+            transition="all 0.2s"
+            _hover={{
+              bg: 'blue.100',
+              borderColor: 'blue.300',
+            }}
+            onClick={() => navigate('/settings/wallet-details')}
+          >
+            <Flex justify="space-between" align="center">
+              <Box>
+                <Text fontSize="sm" color="blue.700" fontWeight="semibold">
+                  Wallet Overview
+                </Text>
+                <Text fontSize="lg" color="blue.900">
+                  {accounts.filter(acc => acc.type === 'wallet').length} wallet{accounts.filter(acc => acc.type === 'wallet').length !== 1 ? 's' : ''} • {' '}
+                  {accounts.reduce((total, acc) => total + (acc.metadata?.accountCount || 1), 0)} total account{accounts.reduce((total, acc) => total + (acc.metadata?.accountCount || 1), 0) !== 1 ? 's' : ''}
+                </Text>
+              </Box>
+              <Box color="blue.600">
+                <FiChevronRight size={24} />
+              </Box>
+            </Flex>
+          </Box>
+        )}
 
         {/* Accounts List */}
         {accounts.length === 0 ? (

@@ -74,7 +74,7 @@ A serverless, client-side dApp for multi-chain portfolio tracking that emphasize
 ### Cross-Platform Strategy
 - **Mobile**: Capacitor for iOS/Android deployment
 - **Desktop**: Tauri for native desktop applications
-- **Web**: Standard React deployment with IPFS via Fleek. Support Firefox, Safari and Chromium based browsers.
+- **Web**: Standard React deployment with IPFS via Fleek. Support Firefox, Safari and Chromium based browsers. 
 - **Monorepo**: TurboRepo/Nx for multi-platform management
 
 ### Project Structure
