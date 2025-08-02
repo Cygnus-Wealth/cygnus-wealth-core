@@ -25,6 +25,11 @@ export interface Account {
     walletManagerId?: string;
     chains?: string[];
     source?: string;
+    walletType?: string;
+    detectedChains?: string[];
+    currentChainId?: number;
+    allAddresses?: string[];
+    accountCount?: number;
   };
 }
 
@@ -38,6 +43,10 @@ export interface Asset {
   accountId: string;
   priceUsd: number | null;
   valueUsd: number | null;
+  metadata?: {
+    address?: string;
+    isMultiAccount?: boolean;
+  };
 }
 
 export interface PortfolioState {

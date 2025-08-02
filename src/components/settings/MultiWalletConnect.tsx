@@ -177,16 +177,16 @@ export default function MultiWalletConnect() {
       const originalChainId = await provider.request({ method: 'eth_chainId' });
       
       try {
-        // For now, let's just connect to the current chain and show configured chains
-        const address = accounts[0];
+        // Store all accounts
+        console.log(`Found ${accounts.length} accounts in ${wallet.name}`);
         
-        // Add account with configured chains info
+        // Add a single wallet entry that represents all accounts
         addAccount({
           id: `wallet-${wallet.name.toLowerCase()}-${Date.now()}`,
           type: 'wallet',
           platform: 'Multi-Chain EVM',
-          label: `${wallet.name} (${configuredChains.length} chains)`,
-          address: address,
+          label: `${wallet.name} (${accounts.length} accounts)`,
+          address: accounts[0], // Primary account
           status: 'connected',
           metadata: {
             walletManagerId: wallet.name.toLowerCase(),
@@ -194,7 +194,9 @@ export default function MultiWalletConnect() {
             source: source,
             walletType: wallet.name,
             detectedChains: configuredChains,
-            currentChainId: parseInt(originalChainId, 16)
+            currentChainId: parseInt(originalChainId, 16),
+            allAddresses: accounts, // Store all account addresses
+            accountCount: accounts.length
           }
         });
         

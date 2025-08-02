@@ -66,57 +66,72 @@ export function useAccountSync() {
 
             const { configuredChains } = walletData;
             
-            // Fetch balances from each configured chain using public RPC
-            const balancePromises = configuredChains.map(async (chainName: string) => {
-              try {
-                const chainConfig = chainMap[chainName];
-                if (!chainConfig) {
-                  console.warn(`No chain config for ${chainName}`);
-                  return null;
-                }
-                
-                // Create public client for the chain
-                const client = createPublicClient({
-                  chain: chainConfig.chain,
-                  transport: http()
-                });
+            // Get all addresses to check (primary + any additional)
+            const addressesToCheck = account.metadata?.allAddresses || [account.address];
+            
+            // Fetch balances for all addresses from each configured chain
+            const balancePromises: Promise<Asset | null>[] = [];
+            
+            for (const address of addressesToCheck) {
+              for (const chainName of configuredChains) {
+                balancePromises.push(
+                  (async () => {
+                    try {
+                      const chainConfig = chainMap[chainName];
+                      if (!chainConfig) {
+                        console.warn(`No chain config for ${chainName}`);
+                        return null;
+                      }
+                      
+                      // Create public client for the chain
+                      const client = createPublicClient({
+                        chain: chainConfig.chain,
+                        transport: http()
+                      });
 
-                // Fetch balance
-                const balance = await client.getBalance({ 
-                  address: account.address as Address 
-                });
-                
-                // Skip zero balances
-                if (balance === 0n) return null;
-                
-                // Get native token price
-                let priceData = { price: 0 };
-                try {
-                  priceData = await assetValuator.getPrice(chainConfig.symbol, 'USD');
-                  updatePrice(chainConfig.symbol, priceData.price);
-                } catch (priceError) {
-                  console.warn(`Price not available for ${chainConfig.symbol}`);
-                }
-                
-                // Create asset entry
-                const asset: Asset = {
-                  id: `${account.id}-${chainConfig.symbol}-${chainName}`,
-                  symbol: chainConfig.symbol,
-                  name: chainConfig.name,
-                  balance: formatBalance(balance.toString(), 18),
-                  source: account.label,
-                  chain: chainName,
-                  accountId: account.id,
-                  priceUsd: priceData.price,
-                  valueUsd: parseFloat(formatBalance(balance.toString(), 18)) * priceData.price
-                };
-                
-                return asset;
-              } catch (error) {
-                console.error(`Error fetching balance for ${chainName}:`, error);
-                return null;
+                      // Fetch balance
+                      const balance = await client.getBalance({ 
+                        address: address as Address 
+                      });
+                      
+                      // Skip zero balances
+                      if (balance === 0n) return null;
+                      
+                      // Get native token price
+                      let priceData = { price: 0 };
+                      try {
+                        priceData = await assetValuator.getPrice(chainConfig.symbol, 'USD');
+                        updatePrice(chainConfig.symbol, priceData.price);
+                      } catch (priceError) {
+                        console.warn(`Price not available for ${chainConfig.symbol}`);
+                      }
+                      
+                      // Create asset entry with address info
+                      const asset: Asset = {
+                        id: `${account.id}-${chainConfig.symbol}-${chainName}-${address}`,
+                        symbol: chainConfig.symbol,
+                        name: chainConfig.name,
+                        balance: formatBalance(balance.toString(), 18),
+                        source: account.label,
+                        chain: chainName,
+                        accountId: account.id,
+                        priceUsd: priceData.price,
+                        valueUsd: parseFloat(formatBalance(balance.toString(), 18)) * priceData.price,
+                        metadata: {
+                          address: address,
+                          isMultiAccount: addressesToCheck.length > 1
+                        }
+                      };
+                      
+                      return asset;
+                    } catch (error) {
+                      console.error(`Error fetching balance for ${chainName} - ${address}:`, error);
+                      return null;
+                    }
+                  })()
+                );
               }
-            });
+            }
             
             // Wait for all balance fetches to complete
             const results = await Promise.all(balancePromises);

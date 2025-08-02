@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Box,
   Container,
@@ -12,12 +12,14 @@ import {
   Flex,
   IconButton,
   Grid,
-  Stat
+  Stat,
+  Tooltip
 } from '@chakra-ui/react';
 import { Link } from 'react-router-dom';
 import { FiChevronLeft, FiChevronRight, FiPlus, FiEye, FiEyeOff } from 'react-icons/fi';
 import { useStore } from '../store/useStore';
 import { useAccountSync } from '../hooks/useAccountSync';
+import type { Asset } from '../store/useStore';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -39,10 +41,49 @@ export default function Dashboard() {
   // Get connected accounts count
   const connectedAccounts = accounts.filter(acc => acc.status === 'connected').length;
 
+  // Aggregate assets by symbol and chain
+  const aggregatedAssets = useMemo(() => {
+    const assetMap = new Map<string, {
+      asset: Asset;
+      addresses: Set<string>;
+      totalBalance: number;
+      totalValue: number;
+    }>();
+
+    assets.forEach(asset => {
+      const key = `${asset.symbol}-${asset.chain}`;
+      const existing = assetMap.get(key);
+      const balance = parseFloat(asset.balance);
+      const value = asset.valueUsd || 0;
+      const address = asset.metadata?.address || '';
+
+      if (existing) {
+        existing.addresses.add(address);
+        existing.totalBalance += balance;
+        existing.totalValue += value;
+        existing.asset.balance = existing.totalBalance.toString();
+        existing.asset.valueUsd = existing.totalValue;
+      } else {
+        assetMap.set(key, {
+          asset: {
+            ...asset,
+            balance: balance.toString(),
+            valueUsd: value
+          },
+          addresses: new Set([address]),
+          totalBalance: balance,
+          totalValue: value
+        });
+      }
+    });
+
+    return Array.from(assetMap.values());
+  }, [assets]);
+
   // Filter assets based on zero balance preference
   const filteredAssets = showZeroBalances 
-    ? assets 
-    : assets.filter(asset => parseFloat(asset.balance) > 0);
+    ? aggregatedAssets 
+    : aggregatedAssets.filter(item => item.totalBalance > 0);
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredAssets.length / ITEMS_PER_PAGE);
@@ -150,39 +191,74 @@ export default function Dashboard() {
                 </Table.Header>
                 <Table.Body>
                   {filteredAssets.length > 0 ? (
-                    currentAssets.map((asset) => (
-                      <Table.Row key={asset.id}>
-                        <Table.Cell>
-                          <Stack spacing={0}>
-                            <Text fontWeight="semibold">{asset.symbol}</Text>
-                            <Text fontSize="sm" color="gray.600">{asset.name}</Text>
-                          </Stack>
-                        </Table.Cell>
-                        <Table.Cell textAlign="right" fontFamily="mono">
-                          {asset.balance}
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Badge colorScheme="blue" variant="subtle">
-                            {asset.source}
-                          </Badge>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Badge colorScheme="purple" variant="subtle">
-                            {asset.chain}
-                          </Badge>
-                        </Table.Cell>
-                        <Table.Cell textAlign="right">
-                          ${asset.priceUsd?.toFixed(2) || '-'}
-                        </Table.Cell>
-                        <Table.Cell textAlign="right" fontWeight="semibold">
-                          ${asset.valueUsd?.toFixed(2) || '-'}
-                        </Table.Cell>
-                      </Table.Row>
-                    ))
+                    currentAssets.map((item) => {
+                      const { asset, addresses } = item;
+                      const addressArray = Array.from(addresses);
+                      const showTooltip = addressArray.length > 1;
+                      
+                      return (
+                        <Table.Row key={asset.id}>
+                          <Table.Cell>
+                            <Stack gap={0}>
+                              <Text fontWeight="semibold">{asset.symbol}</Text>
+                              <Text fontSize="sm" color="gray.600">{asset.name}</Text>
+                            </Stack>
+                          </Table.Cell>
+                          <Table.Cell textAlign="right" fontFamily="mono">
+                            {asset.balance}
+                          </Table.Cell>
+                          <Table.Cell>
+                            {showTooltip ? (
+                              <Tooltip.Root>
+                                <Tooltip.Trigger asChild>
+                                  <Badge 
+                                    colorScheme="blue" 
+                                    variant="subtle" 
+                                    cursor="pointer"
+                                    style={{ textDecoration: 'underline dotted' }}
+                                  >
+                                    {asset.source}
+                                  </Badge>
+                                </Tooltip.Trigger>
+                                <Tooltip.Positioner>
+                                  <Tooltip.Content>
+                                    <Box p={2}>
+                                      <Text fontSize="xs" fontWeight="semibold" mb={1}>
+                                        Accounts ({addressArray.length}):
+                                      </Text>
+                                      {addressArray.map((addr, idx) => (
+                                        <Text key={idx} fontSize="xs" fontFamily="mono">
+                                          {addr.slice(0, 6)}...{addr.slice(-4)}
+                                        </Text>
+                                      ))}
+                                    </Box>
+                                  </Tooltip.Content>
+                                </Tooltip.Positioner>
+                              </Tooltip.Root>
+                            ) : (
+                              <Badge colorScheme="blue" variant="subtle">
+                                {asset.source}
+                              </Badge>
+                            )}
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Badge colorScheme="purple" variant="subtle">
+                              {asset.chain}
+                            </Badge>
+                          </Table.Cell>
+                          <Table.Cell textAlign="right">
+                            ${asset.priceUsd?.toFixed(2) || '-'}
+                          </Table.Cell>
+                          <Table.Cell textAlign="right" fontWeight="semibold">
+                            ${asset.valueUsd?.toFixed(2) || '-'}
+                          </Table.Cell>
+                        </Table.Row>
+                      );
+                    })
                   ) : (
                     <Table.Row>
                       <Table.Cell colSpan={6} textAlign="center" py={20}>
-                        <Stack spacing={4} align="center">
+                        <Stack gap={4} align="center">
                           <Box
                             p={4}
                             bg="gray.50"
