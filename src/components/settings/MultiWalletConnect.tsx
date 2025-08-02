@@ -10,7 +10,7 @@ import {
 } from '@chakra-ui/react';
 import { FiExternalLink } from 'react-icons/fi';
 import { useStore } from '../../store/useStore';
-import { WalletManager, IntegrationSource } from '@cygnus-wealth/wallet-integration-system';
+import { IntegrationSource } from '@cygnus-wealth/wallet-integration-system';
 
 const toaster = createToaster({
   placement: 'top'
@@ -91,7 +91,6 @@ const WALLET_PROVIDERS: WalletProvider[] = [
 export default function MultiWalletConnect() {
   const [isConnecting, setIsConnecting] = useState(false);
   const { addAccount } = useStore();
-  const [walletManager] = useState(() => new WalletManager());
 
   const detectWallets = () => {
     if (!window.ethereum) return [];
@@ -177,24 +176,12 @@ export default function MultiWalletConnect() {
       const originalChainId = await provider.request({ method: 'eth_chainId' });
       
       try {
-        // Use wallet-integration-system to connect to all chains
-        console.log(`Connecting ${wallet.name} with wallet-integration-system...`);
+        // For now, let's use the direct approach instead of wallet-integration-system
+        // due to Firefox multi-wallet issues with selectExtension
+        console.log(`Connecting ${wallet.name} directly...`);
         
-        // Store wallet manager globally for use in sync
-        if (!(window as any).__cygnusWalletManager) {
-          (window as any).__cygnusWalletManager = walletManager;
-        }
-        
-        // Connect to all EVM chains to get all accounts and balances
-        const result = await walletManager.connectAllEVMChains(source);
-        console.log('Connection result:', result);
-        
-        // Get all unique accounts from connections
-        const uniqueAddresses = new Set<string>();
-        result.connections.forEach(conn => uniqueAddresses.add(conn.address));
-        const allAccounts = Array.from(uniqueAddresses);
-        
-        console.log(`Found ${allAccounts.length} unique accounts across ${result.connections.length} chains`);
+        // Use the accounts we already have from eth_requestAccounts
+        console.log(`Found ${accounts.length} accounts from ${wallet.name}`);
         
         // Store wallet info with all accounts and chains
         const walletId = `wallet-${wallet.name.toLowerCase()}-${Date.now()}`;
@@ -203,8 +190,8 @@ export default function MultiWalletConnect() {
           id: walletId,
           type: 'wallet',
           platform: 'Multi-Chain EVM',
-          label: `${wallet.name} (${allAccounts.length} account${allAccounts.length > 1 ? 's' : ''})`,
-          address: allAccounts[0], // Primary account
+          label: `${wallet.name} (${accounts.length} account${accounts.length > 1 ? 's' : ''})`,
+          address: accounts[0], // Primary account
           status: 'connected',
           metadata: {
             walletManagerId: walletId,
@@ -213,15 +200,14 @@ export default function MultiWalletConnect() {
             walletType: wallet.name,
             detectedChains: configuredChains,
             currentChainId: parseInt(originalChainId, 16),
-            allAddresses: allAccounts,
-            accountCount: allAccounts.length,
-            useWalletManager: true // Flag to use new wallet manager approach
+            allAddresses: accounts,
+            accountCount: accounts.length
           }
         });
         
         toaster.create({
           title: 'Wallet Connected',
-          description: `Connected ${allAccounts.length} ${wallet.name} account${allAccounts.length > 1 ? 's' : ''} across ${configuredChains.length} chain${configuredChains.length > 1 ? 's' : ''}`,
+          description: `Connected ${accounts.length} ${wallet.name} account${accounts.length > 1 ? 's' : ''} across ${configuredChains.length} chain${configuredChains.length > 1 ? 's' : ''}`,
           type: 'success',
           duration: 5000,
         });

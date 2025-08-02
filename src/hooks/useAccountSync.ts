@@ -55,68 +55,9 @@ export function useAccountSync() {
         try {
           // Check if this is a multi-chain wallet
           if (account.platform === 'Multi-Chain EVM' && account.metadata?.walletManagerId) {
-            // Check if we should use the new wallet manager approach
-            if (account.metadata?.useWalletManager && (window as any).__cygnusWalletManager) {
-              try {
-                const walletManager = (window as any).__cygnusWalletManager;
-                console.log('Using wallet manager for account sync');
-                
-                // Get all account balances from wallet manager
-                const allBalances = await walletManager.getAllAccountBalances();
-                console.log('All account balances:', allBalances);
-                
-                // Process balances for each wallet
-                for (const [, walletData] of Object.entries(allBalances as any)) {
-                  for (const [address, accountData] of Object.entries((walletData as any).balancesByAccount)) {
-                    const { balances } = accountData as any;
-                    
-                    // Process each balance
-                    for (const balance of balances) {
-                      // Skip zero balances
-                      if (parseFloat(balance.amount) === 0) continue;
-                      
-                      // Get chain name from enum
-                      const chainName = balance.chain;
-                      
-                      // Get price
-                      let priceData = { price: 0 };
-                      try {
-                        priceData = await assetValuator.getPrice(balance.asset.symbol, 'USD');
-                        updatePrice(balance.asset.symbol, priceData.price);
-                      } catch (priceError) {
-                        console.warn(`Price not available for ${balance.asset.symbol}`);
-                      }
-                      
-                      // Create asset entry
-                      const asset: Asset = {
-                        id: `${account.id}-${balance.asset.symbol}-${chainName}-${address}`,
-                        symbol: balance.asset.symbol,
-                        name: balance.asset.name,
-                        balance: balance.amount,
-                        source: account.label,
-                        chain: chainName,
-                        accountId: account.id,
-                        priceUsd: priceData.price,
-                        valueUsd: parseFloat(balance.amount) * priceData.price,
-                        metadata: {
-                          address: address,
-                          isMultiAccount: true
-                        }
-                      };
-                      
-                      allAssets.push(asset);
-                    }
-                  }
-                }
-              } catch (error) {
-                console.error('Error using wallet manager, falling back to manual fetch:', error);
-                // Fall back to manual fetching if wallet manager fails
-                await fetchBalancesManually();
-              }
-            } else {
-              // Use manual fetching approach
-              await fetchBalancesManually();
-            }
+            // For now, always use manual fetching due to Firefox multi-wallet issues
+            // The wallet-integration-system's selectExtension method causes problems
+            await fetchBalancesManually();
             
             async function fetchBalancesManually() {
               // Use configured chains from account metadata
