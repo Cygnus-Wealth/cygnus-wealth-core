@@ -10,6 +10,7 @@ import {
 } from '@chakra-ui/react';
 import { FiExternalLink } from 'react-icons/fi';
 import { useStore } from '../../store/useStore';
+import { WalletManager, IntegrationSource } from '@cygnus-wealth/wallet-integration-system';
 
 const toaster = createToaster({
   placement: 'top'
@@ -90,6 +91,7 @@ const WALLET_PROVIDERS: WalletProvider[] = [
 export default function MultiWalletConnect() {
   const [isConnecting, setIsConnecting] = useState(false);
   const { addAccount } = useStore();
+  const [walletManager] = useState(() => new WalletManager());
 
   const detectWallets = () => {
     if (!window.ethereum) return [];
@@ -115,7 +117,7 @@ export default function MultiWalletConnect() {
 
       console.log(`Connecting with ${wallet.name}...`);
       
-      // Use the specific provider's request method
+      // First request account access to ensure we have permission
       const accounts = await provider.request({ 
         method: 'eth_requestAccounts' 
       });
@@ -124,44 +126,66 @@ export default function MultiWalletConnect() {
         throw new Error('No accounts found');
       }
 
-      const address = accounts[0];
-      
-      // Get the current chain ID
-      const chainId = await provider.request({ method: 'eth_chainId' });
-      const chainIdNumber = parseInt(chainId, 16);
-      
-      // Map chain ID to platform name
-      const platformMap: { [key: number]: string } = {
-        1: 'Ethereum',
-        137: 'Polygon',
-        42161: 'Arbitrum',
-        10: 'Optimism',
-        56: 'BSC',
-        43114: 'Avalanche'
+      // Map wallet name to IntegrationSource
+      const sourceMap: { [key: string]: IntegrationSource } = {
+        'MetaMask': IntegrationSource.METAMASK,
+        'Rabby': IntegrationSource.RABBY,
+        'Coinbase Wallet': IntegrationSource.COINBASE_WALLET,
+        'Brave Wallet': IntegrationSource.METAMASK // Brave uses MetaMask-like interface
       };
       
-      const platform = platformMap[chainIdNumber] || 'Ethereum';
+      const source = sourceMap[wallet.name] || IntegrationSource.METAMASK;
       
-      // Add account to store
-      addAccount({
-        id: `wallet-${wallet.name.toLowerCase()}-${Date.now()}`,
-        type: 'wallet',
-        platform: platform,
-        label: `${wallet.name} (${platform})`,
-        address: address,
-        status: 'connected',
-        metadata: {
-          walletType: wallet.name,
-          chainId: chainIdNumber
+      // Set the provider on window.ethereum temporarily for wallet-integration-system
+      const originalEthereum = window.ethereum;
+      window.ethereum = provider;
+      
+      try {
+        // Use connectAllEVMChains to connect to all supported chains
+        if (typeof (walletManager as any).connectAllEVMChains === 'function') {
+          console.log('Using connectAllEVMChains method');
+          
+          const { connections, balances } = await (walletManager as any).connectAllEVMChains(source);
+          
+          if (connections.length === 0) {
+            throw new Error('No chains connected');
+          }
+          
+          // Get the address (same for all EVM chains)
+          const address = connections[0].address;
+          
+          // Add a single multi-chain wallet account
+          addAccount({
+            id: `wallet-${wallet.name.toLowerCase()}-${Date.now()}`,
+            type: 'wallet',
+            platform: 'Multi-Chain EVM',
+            label: `${wallet.name} (Multi-Chain)`,
+            address: address,
+            status: 'connected',
+            metadata: {
+              walletManagerId: 'default',
+              chains: connections.map((c: any) => c.chain),
+              source: source,
+              walletType: wallet.name
+            }
+          });
+          
+          // Store wallet manager instance globally for balance fetching
+          (window as any).__walletManager = walletManager;
+          
+          toaster.create({
+            title: 'Wallet Connected',
+            description: `Connected to ${connections.length} chains: ${address.slice(0, 6)}...${address.slice(-4)}`,
+            type: 'success',
+            duration: 5000,
+          });
+        } else {
+          throw new Error('Multi-chain connection not available');
         }
-      });
-
-      toaster.create({
-        title: 'Wallet Connected',
-        description: `Connected ${wallet.name}: ${address.slice(0, 6)}...${address.slice(-4)}`,
-        type: 'success',
-        duration: 5000,
-      });
+      } finally {
+        // Restore original ethereum provider
+        window.ethereum = originalEthereum;
+      }
     } catch (error: any) {
       console.error('Connection error:', error);
       

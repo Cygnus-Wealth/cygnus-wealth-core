@@ -31,7 +31,7 @@ const platformIcons: Record<string, React.ElementType> = {
 };
 
 export default function Accounts() {
-  const { accounts, addAccount, updateAccount, removeAccount } = useStore();
+  const { accounts, updateAccount, removeAccount } = useStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   const getStatusColor = (status: 'connected' | 'disconnected' | 'error') => {
@@ -181,18 +181,20 @@ export default function Accounts() {
                     <Stack direction="row" spacing={1}>
                       <IconButton
                         aria-label="Edit account"
-                        icon={<FiEdit2 />}
                         variant="ghost"
                         size="sm"
-                      />
+                      >
+                        <FiEdit2 />
+                      </IconButton>
                       <IconButton
                         aria-label="Delete account"
-                        icon={<FiTrash2 />}
                         variant="ghost"
                         size="sm"
                         color="red.500"
                         onClick={() => handleDelete(account.id)}
-                      />
+                      >
+                        <FiTrash2 />
+                      </IconButton>
                     </Stack>
                   </Flex>
 
@@ -223,14 +225,41 @@ export default function Accounts() {
                         Last synced: {account.lastSync}
                       </Text>
                     )}
+                    
+                    {/* Show connected chains for multi-chain wallets */}
+                    {account.platform === 'Multi-Chain EVM' && account.metadata?.chains && (
+                      <Box>
+                        <Text fontSize="sm" color="gray.600" mb={1}>
+                          Connected chains:
+                        </Text>
+                        <Flex gap={1} flexWrap="wrap">
+                          {account.metadata.chains.map((chain) => (
+                            <Badge key={chain} size="sm" colorScheme="blue">
+                              {chain}
+                            </Badge>
+                          ))}
+                        </Flex>
+                      </Box>
+                    )}
                   </Stack>
 
-                  {/* Token Manager for single-chain wallet accounts only */}
+                  {/* Token Manager for wallet accounts */}
                   {account.type === 'wallet' && 
-                   account.status === 'connected' && 
-                   account.platform !== 'Multi-Chain EVM' && (
+                   account.status === 'connected' && (
                     <Box pt={4} borderTop="1px solid" borderColor="gray.200">
-                      <TokenManager accountId={account.id} platform={account.platform} />
+                      {account.platform === 'Multi-Chain EVM' ? (
+                        <Box>
+                          <Text fontSize="sm" color="gray.600" mb={2}>
+                            <strong>Note:</strong> Token detection for multi-chain wallets is currently limited. 
+                            Only native tokens (ETH, MATIC, BNB, etc.) are automatically detected.
+                          </Text>
+                          <Text fontSize="sm" color="blue.600">
+                            To track ERC20 tokens, please add individual chain accounts using the "Add Manually" button.
+                          </Text>
+                        </Box>
+                      ) : (
+                        <TokenManager accountId={account.id} platform={account.platform} />
+                      )}
                     </Box>
                   )}
 
