@@ -20,11 +20,11 @@ interface SettingsItem {
 
 const settingsItems: SettingsItem[] = [
   {
-    id: 'accounts',
-    label: 'Accounts',
-    description: 'Manage your connected accounts and API keys',
+    id: 'connections',
+    label: 'Connections',
+    description: 'Manage your wallet and exchange connections',
     icon: FiUser,
-    path: '/settings/accounts',
+    path: '/settings/connections',
   },
   {
     id: 'security',

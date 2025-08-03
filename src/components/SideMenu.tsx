@@ -28,7 +28,7 @@ const menuItems: MenuItem[] = [
     icon: FiSettings, 
     path: '/settings',
     subItems: [
-      { id: 'accounts', label: 'Accounts', icon: FiSettings, path: '/settings/accounts' },
+      { id: 'connections', label: 'Connections', icon: FiSettings, path: '/settings/connections' },
     ]
   },
 ];

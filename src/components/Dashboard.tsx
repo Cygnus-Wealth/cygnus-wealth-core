@@ -69,7 +69,7 @@ export default function Dashboard() {
 
       if (existing) {
         existing.addresses.add(address);
-        existing.walletIds.add(walletId);
+        existing.connectionInfo.walletIds.add(walletId);
         existing.totalBalance += balance;
         existing.totalValue += value;
         existing.asset.balance = existing.totalBalance.toString();
@@ -157,7 +157,7 @@ export default function Dashboard() {
                   {connectedAccounts}
                 </Stat.ValueText>
                 <Stat.HelpText>
-                  <Button as={Link} to="/settings/accounts" size="sm" variant="link" colorScheme="blue">
+                  <Button as={Link} to="/settings/connections" size="sm" variant="link" colorScheme="blue">
                     {connectedAccounts === 0 ? 'Add accounts' : 'Manage'}
                   </Button>
                 </Stat.HelpText>
@@ -298,11 +298,11 @@ export default function Dashboard() {
                           </Text>
                           <Button
                             as={Link}
-                            to="/settings/accounts"
+                            to="/settings/connections"
                             colorScheme="blue"
                             leftIcon={<FiPlus />}
                           >
-                            Go to Settings → Accounts
+                            Go to Settings → Connections
                           </Button>
                         </Stack>
                       </Table.Cell>
@@ -326,21 +326,23 @@ export default function Dashboard() {
                 <Stack direction="row" spacing={2}>
                   <IconButton
                     aria-label="Previous page"
-                    icon={<FiChevronLeft />}
                     size="sm"
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                     disabled={currentPage === 1}
-                  />
+                  >
+                    <FiChevronLeft />
+                  </IconButton>
                   <Button size="sm" variant="outline">
                     {currentPage} / {totalPages}
                   </Button>
                   <IconButton
                     aria-label="Next page"
-                    icon={<FiChevronRight />}
                     size="sm"
                     onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                     disabled={currentPage === totalPages}
-                  />
+                  >
+                    <FiChevronRight />
+                  </IconButton>
                 </Stack>
               </Flex>
             )}

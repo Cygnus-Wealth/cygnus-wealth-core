@@ -9,6 +9,8 @@ import {
   WalletManager, 
   Chain 
 } from '@cygnus-wealth/wallet-integration-system';
+import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { getFullnodeUrl, SuiClient } from '@mysten/sui.js/client';
 
 const assetValuator = new AssetValuator();
 
@@ -43,7 +45,9 @@ const chainEnumMap: Record<string, Chain> = {
   'Optimism': Chain.OPTIMISM,
   'BSC': Chain.BSC,
   'Avalanche': Chain.AVALANCHE,
-  'Base': Chain.BASE
+  'Base': Chain.BASE,
+  'Solana': Chain.SOLANA,
+  'SUI': Chain.SUI
 };
 
 export function useAccountSync() {
@@ -230,8 +234,111 @@ export function useAccountSync() {
               const results = await Promise.all(balancePromises);
               const validAssets = results.filter((asset): asset is Asset => asset !== null);
               allAssets.push(...validAssets);
+            } else if (account.platform === 'Solana') {
+              // Handle Solana accounts
+              try {
+                // Use configured RPC endpoints from the app config
+                const { getRpcEndpoints } = await import('../config/rpc');
+                const rpcEndpoints = getRpcEndpoints('solana');
+                
+                let connection: Connection | null = null;
+                let lastError: any = null;
+                
+                // Try each endpoint until one works
+                for (const endpoint of rpcEndpoints) {
+                  try {
+                    connection = new Connection(endpoint, {
+                      commitment: 'confirmed',
+                      httpHeaders: {
+                        'Content-Type': 'application/json',
+                      }
+                    });
+                    
+                    // Test the connection
+                    await connection.getLatestBlockhash();
+                    console.log(`Using Solana RPC endpoint: ${endpoint}`);
+                    break;
+                  } catch (error) {
+                    console.warn(`Failed to connect to ${endpoint}:`, error);
+                    lastError = error;
+                  }
+                }
+                
+                if (!connection) {
+                  throw new Error(`All Solana RPC endpoints failed. Last error: ${lastError?.message}`);
+                }
+                
+                const publicKey = new PublicKey(account.address);
+                
+                // Get SOL balance
+                const balance = await connection.getBalance(publicKey);
+                const solBalance = balance / LAMPORTS_PER_SOL;
+                
+                // Skip if balance is 0
+                if (solBalance === 0) {
+                  console.log(`Skipping zero balance for Solana account ${account.address}`);
+                } else {
+                  // Get SOL price
+                  const priceData = await assetValuator.getPrice('SOL', 'USD');
+                  updatePrice('SOL', priceData.price);
+                  
+                  // Create asset entry
+                  const asset: Asset = {
+                    id: `${account.id}-SOL-solana`,
+                    symbol: 'SOL',
+                    name: 'Solana',
+                    balance: solBalance.toString(),
+                    source: account.label,
+                    chain: 'Solana',
+                    accountId: account.id,
+                    priceUsd: priceData.price,
+                    valueUsd: solBalance * priceData.price
+                  };
+                  
+                  allAssets.push(asset);
+                }
+                
+                // TODO: Fetch SPL token balances
+              } catch (error) {
+                console.error(`Failed to fetch Solana balance for ${account.address}:`, error);
+                // Continue with other accounts instead of throwing
+              }
+              
+            } else if (account.platform === 'SUI') {
+              // Handle SUI accounts
+              const client = new SuiClient({ url: getFullnodeUrl('mainnet') });
+              
+              // Get SUI balance
+              const balance = await client.getBalance({
+                owner: account.address,
+                coinType: '0x2::sui::SUI'
+              });
+              
+              const suiBalance = parseInt(balance.totalBalance) / 1e9; // SUI has 9 decimals
+              
+              // Get SUI price
+              const priceData = await assetValuator.getPrice('SUI', 'USD');
+              updatePrice('SUI', priceData.price);
+              
+              // Create asset entry
+              const asset: Asset = {
+                id: `${account.id}-SUI-sui`,
+                symbol: 'SUI',
+                name: 'Sui',
+                balance: suiBalance.toString(),
+                source: account.label,
+                chain: 'SUI',
+                accountId: account.id,
+                priceUsd: priceData.price,
+                valueUsd: suiBalance * priceData.price
+              };
+              
+              allAssets.push(asset);
+              
+              // TODO: Fetch other SUI tokens
+              
             } else {
-              // Legacy single-chain handling
+              // Legacy EVM single-chain handling
               const chainConfig = chainMap[account.platform as keyof typeof chainMap] || chainMap['Ethereum'];
               
               // Create public client for the chain

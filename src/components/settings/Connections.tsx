@@ -9,6 +9,7 @@ import {
   Flex,
   IconButton,
   Grid,
+  Stat,
 } from '@chakra-ui/react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiPlus, FiEdit2, FiTrash2, FiKey, FiExternalLink } from 'react-icons/fi';
@@ -38,7 +39,7 @@ interface ConnectionGroup {
   totalAccounts: number;
 }
 
-export default function Accounts() {
+export default function Connections() {
   const { accounts, updateAccount, removeAccount } = useStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const navigate = useNavigate();
@@ -74,6 +75,16 @@ export default function Accounts() {
     });
     
     return Array.from(groups.values());
+  }, [accounts]);
+  
+  // Calculate overall totals
+  const totalAccounts = accounts.filter(acc => acc.type === 'wallet').length;
+  const totalChains = useMemo(() => {
+    const chains = new Set<string>();
+    accounts.filter(acc => acc.type === 'wallet').forEach(account => {
+      account.metadata?.detectedChains?.forEach(chain => chains.add(chain));
+    });
+    return chains.size;
   }, [accounts]);
   
   const getStatusColor = (status: 'connected' | 'disconnected' | 'error') => {
@@ -199,15 +210,45 @@ export default function Accounts() {
               size="sm"
             />
             <Heading as="h1" size="3xl">
-              Accounts
+              Connections
             </Heading>
           </Flex>
           <Text color="gray.600" ml={12}>
-            Manage your connected wallets, exchanges, and API keys
+            Manage your wallet and exchange connections
           </Text>
         </Box>
 
-        {/* Add Account Actions */}
+        {/* Summary Stats */}
+        {(connectionGroups.length > 0 || otherAccounts.length > 0) && (
+          <Grid templateColumns={{ base: '1fr', md: 'repeat(3, 1fr)' }} gap={4}>
+            <Box p={4} bg="gray.50" borderRadius="lg">
+              <Stat.Root>
+                <Stat.Label color="gray.600">Total Connections</Stat.Label>
+                <Stat.ValueText fontSize="2xl">
+                  {connectionGroups.length + (otherAccounts.length > 0 ? 1 : 0)}
+                </Stat.ValueText>
+              </Stat.Root>
+            </Box>
+            <Box p={4} bg="gray.50" borderRadius="lg">
+              <Stat.Root>
+                <Stat.Label color="gray.600">Total Accounts</Stat.Label>
+                <Stat.ValueText fontSize="2xl">
+                  {totalAccounts}
+                </Stat.ValueText>
+              </Stat.Root>
+            </Box>
+            <Box p={4} bg="gray.50" borderRadius="lg">
+              <Stat.Root>
+                <Stat.Label color="gray.600">Connected Chains</Stat.Label>
+                <Stat.ValueText fontSize="2xl">
+                  {totalChains}
+                </Stat.ValueText>
+              </Stat.Root>
+            </Box>
+          </Grid>
+        )}
+
+        {/* Add Connection Actions */}
         <Box>
           <Stack direction="row" spacing={4} wrap="wrap">
             <MultiWalletConnect />
@@ -229,140 +270,135 @@ export default function Accounts() {
             <Heading as="h2" size="lg" mb={4}>
               Wallet Connections
             </Heading>
-            <Stack gap={4}>
+            <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }} gap={4}>
               {connectionGroups.map((group) => {
                 const Icon = platformIcons['Multi-Chain EVM'] || SiEthereum;
                 
                 return (
                   <Box
                     key={group.connectionType}
-                    p={6}
+                    p={4}
                     bg="white"
                     borderRadius="lg"
                     border="1px solid"
                     borderColor="gray.200"
                     shadow="sm"
+                    transition="all 0.2s"
+                    _hover={{
+                      shadow: 'md',
+                      borderColor: 'gray.300',
+                    }}
                   >
-                    <Stack gap={4}>
+                    <Stack gap={3}>
                       {/* Connection Header */}
                       <Flex justify="space-between" align="flex-start">
-                        <Flex gap={3} align="center">
+                        <Flex gap={2} align="center" flex="1">
                           <Box
-                            p={2}
+                            p={1.5}
                             bg="gray.100"
                             borderRadius="lg"
                             color="gray.700"
                           >
-                            <Icon size={24} />
+                            <Icon size={20} />
                           </Box>
-                          <Box>
-                            <Text fontWeight="semibold" fontSize="xl">
+                          <Box flex="1">
+                            <Text fontWeight="semibold" fontSize="md">
                               {group.connectionType}
                             </Text>
-                            <Text fontSize="sm" color="gray.600">
-                              {group.totalWallets} wallet{group.totalWallets !== 1 ? 's' : ''} • {' '}
+                            <Text fontSize="xs" color="gray.600">
                               {group.totalAccounts} account{group.totalAccounts !== 1 ? 's' : ''}
                             </Text>
                           </Box>
                         </Flex>
                         
-                        {/* View Details Link */}
+                        {/* Delete Button */}
+                        <IconButton
+                          aria-label="Delete connection"
+                          variant="ghost"
+                          size="sm"
+                          color="red.500"
+                          onClick={() => {
+                            if (confirm(`Are you sure you want to remove all ${group.connectionType} accounts?`)) {
+                              group.accounts.forEach(account => handleDelete(account.id));
+                            }
+                          }}
+                        >
+                          <FiTrash2 />
+                        </IconButton>
+                      </Flex>
+
+                      {/* Account Summary */}
+                      <Box p={2} bg="gray.50" borderRadius="md">
+                        <Text fontSize="xs" color="gray.600">
+                          {group.accounts.filter(a => a.status === 'connected').length} connected • {' '}
+                          {group.accounts.filter(a => a.status === 'disconnected').length} disconnected
+                          {group.accounts.filter(a => a.status === 'error').length > 0 && (
+                            <> • <Text as="span" color="red.600">{group.accounts.filter(a => a.status === 'error').length} error</Text></>
+                          )}
+                        </Text>
+                      </Box>
+
+                      {/* Chains Info */}
+                      {group.accounts[0]?.metadata?.detectedChains && (
+                        <Text fontSize="xs" color="gray.600">
+                          Chains: {group.accounts[0].metadata.detectedChains.join(', ')}
+                        </Text>
+                      )}
+
+                      {/* Quick Actions */}
+                      <Stack gap={2}>
                         <Button
                           size="sm"
-                          variant="ghost"
-                          rightIcon={<FiExternalLink />}
+                          variant="outline"
+                          w="full"
                           onClick={() => navigate(`/settings/wallet-details/${encodeURIComponent(group.connectionType)}`)}
                         >
                           View Details
                         </Button>
-                      </Flex>
-
-                      {/* Account List */}
-                      <Grid templateColumns={{ base: '1fr', lg: 'repeat(2, 1fr)' }} gap={3}>
-                        {group.accounts.map((account) => (
-                          <Box
-                            key={account.id}
-                            p={4}
-                            bg="gray.50"
-                            borderRadius="md"
-                            border="1px solid"
-                            borderColor="gray.200"
+                        {group.accounts.some(a => a.status === 'disconnected') && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            colorScheme="blue"
+                            w="full"
+                            onClick={() => {
+                              group.accounts
+                                .filter(a => a.status === 'disconnected')
+                                .forEach(a => handleConnect(a.id));
+                            }}
                           >
-                            <Stack gap={2}>
-                              <Flex justify="space-between" align="center">
-                                <Box>
-                                  <Text fontWeight="medium">
-                                    {account.label}
-                                  </Text>
-                                  <Text fontSize="xs" color="gray.600" fontFamily="mono">
-                                    {account.address}
-                                  </Text>
-                                </Box>
-                                <Badge
-                                  colorScheme={getStatusColor(account.status)}
-                                  size="sm"
-                                >
-                                  {account.status}
-                                </Badge>
-                              </Flex>
-                              
-                              {/* Actions */}
-                              <Flex gap={2} justify="flex-end">
-                                <IconButton
-                                  aria-label="Delete account"
-                                  variant="ghost"
-                                  size="sm"
-                                  color="red.500"
-                                  onClick={() => handleDelete(account.id)}
-                                >
-                                  <FiTrash2 />
-                                </IconButton>
-                                <Button
-                                  variant="outline"
-                                  colorScheme={account.status === 'connected' ? 'red' : 'blue'}
-                                  size="sm"
-                                  onClick={() => 
-                                    account.status === 'connected' 
-                                      ? handleDisconnect(account.id) 
-                                      : handleConnect(account.id)
-                                  }
-                                >
-                                  {account.status === 'connected' ? 'Disconnect' : 'Connect'}
-                                </Button>
-                              </Flex>
-                            </Stack>
-                          </Box>
-                        ))}
-                      </Grid>
-
-                      {/* Connected chains info */}
-                      {group.accounts[0]?.metadata?.detectedChains && (
-                        <Box>
-                          <Text fontSize="sm" color="gray.600" mb={2}>
-                            Connected chains:
-                          </Text>
-                          <Flex gap={1} flexWrap="wrap">
-                            {group.accounts[0].metadata.detectedChains.map((chain) => (
-                              <Badge key={chain} size="sm" colorScheme="blue">
-                                {chain}
-                              </Badge>
-                            ))}
-                          </Flex>
-                        </Box>
-                      )}
+                            Connect All
+                          </Button>
+                        )}
+                        {group.accounts.some(a => a.status === 'connected') && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            colorScheme="red"
+                            w="full"
+                            onClick={() => {
+                              group.accounts
+                                .filter(a => a.status === 'connected')
+                                .forEach(a => handleDisconnect(a.id));
+                            }}
+                          >
+                            Disconnect All
+                          </Button>
+                        )}
+                      </Stack>
                     </Stack>
                   </Box>
                 );
               })}
-            </Stack>
+            </Grid>
           </Box>
         )}
 
-        {/* Other Accounts (CEX, DEX, Manual) */}
+        {/* Other Connections (CEX, DEX, Manual) */}
         {otherAccounts.length > 0 && (
           <Box>
             <Heading as="h2" size="lg" mb={4}>
-              Other Accounts
+              Exchange Connections
             </Heading>
             <Grid templateColumns={{ base: '1fr', lg: 'repeat(2, 1fr)' }} gap={4}>
               {otherAccounts.map((account) => {
@@ -416,14 +452,14 @@ export default function Accounts() {
                         {/* Actions */}
                         <Stack direction="row" spacing={1}>
                           <IconButton
-                            aria-label="Edit account"
+                            aria-label="Edit connection"
                             variant="ghost"
                             size="sm"
                           >
                             <FiEdit2 />
                           </IconButton>
                           <IconButton
-                            aria-label="Delete account"
+                            aria-label="Delete connection"
                             variant="ghost"
                             size="sm"
                             color="red.500"
@@ -498,10 +534,10 @@ export default function Accounts() {
         {accounts.length === 0 && (
           <Box p={8} bg="gray.50" borderRadius="lg" textAlign="center">
             <Text fontSize="lg" color="gray.600" mb={4}>
-              No accounts added yet
+              No connections added yet
             </Text>
             <Text color="gray.500" mb={4}>
-              Add your first account to start tracking your portfolio
+              Connect your wallet or exchange to start tracking your portfolio
             </Text>
           </Box>
         )}
@@ -515,7 +551,7 @@ export default function Accounts() {
           borderColor="blue.200"
         >
           <Text fontSize="sm" color="blue.800">
-            <strong>Privacy Notice:</strong> All account data is stored locally in your browser
+            <strong>Privacy Notice:</strong> All connection data is stored locally in your browser
             or encrypted on IPFS. CygnusWealth never has access to your private keys or API secrets.
           </Text>
         </Box>
