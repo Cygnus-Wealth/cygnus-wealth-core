@@ -69,12 +69,73 @@ export default function Accounts() {
     updateAccount(accountId, { status: 'connected', lastSync: new Date().toISOString() });
   };
 
-  const handleDisconnect = (accountId: string) => {
+  const handleDisconnect = async (accountId: string) => {
+    const account = accounts.find(acc => acc.id === accountId);
+    if (!account) return;
+    
+    // If this account uses WalletManager, disconnect through it
+    if (account.metadata?.useWalletManager) {
+      const walletManager = (window as any).__cygnusWalletManager as any;
+      if (walletManager && account.metadata?.walletManagerId) {
+        try {
+          // Find all accounts with the same walletManagerId
+          const relatedAccounts = accounts.filter(
+            acc => acc.metadata?.walletManagerId === account.metadata?.walletManagerId
+          );
+          
+          // Disconnect all chains for this wallet
+          const { Chain } = await import('@cygnus-wealth/wallet-integration-system');
+          const chains = [
+            Chain.ETHEREUM,
+            Chain.POLYGON,
+            Chain.BSC,
+            Chain.ARBITRUM,
+            Chain.OPTIMISM,
+            Chain.AVALANCHE,
+            Chain.BASE
+          ];
+          
+          for (const chain of chains) {
+            try {
+              await walletManager.disconnectWallet(chain);
+            } catch {
+              // Chain might not be connected, ignore
+            }
+          }
+          
+          // Update all related accounts to disconnected
+          relatedAccounts.forEach(acc => {
+            updateAccount(acc.id, { status: 'disconnected' });
+          });
+          
+          return;
+        } catch (error) {
+          console.error('Error disconnecting wallet:', error);
+        }
+      }
+    }
+    
+    // Fallback to simple status update
     updateAccount(accountId, { status: 'disconnected' });
   };
 
-  const handleDelete = (accountId: string) => {
+  const handleDelete = async (accountId: string) => {
     if (confirm('Are you sure you want to remove this account?')) {
+      const account = accounts.find(acc => acc.id === accountId);
+      if (!account) return;
+      
+      // If this is the last account for a wallet using WalletManager, disconnect it
+      if (account.metadata?.useWalletManager && account.metadata?.walletManagerId) {
+        const relatedAccounts = accounts.filter(
+          acc => acc.metadata?.walletManagerId === account.metadata?.walletManagerId
+        );
+        
+        if (relatedAccounts.length === 1) {
+          // This is the last account, disconnect the wallet
+          await handleDisconnect(accountId);
+        }
+      }
+      
       removeAccount(accountId);
     }
   };

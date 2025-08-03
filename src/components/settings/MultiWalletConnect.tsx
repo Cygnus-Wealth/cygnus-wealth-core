@@ -10,7 +10,11 @@ import {
 } from '@chakra-ui/react';
 import { FiExternalLink } from 'react-icons/fi';
 import { useStore } from '../../store/useStore';
-import { IntegrationSource } from '@cygnus-wealth/wallet-integration-system';
+import { 
+  WalletManager, 
+  Chain, 
+  IntegrationSource 
+} from '@cygnus-wealth/wallet-integration-system';
 
 const toaster = createToaster({
   placement: 'top'
@@ -19,74 +23,68 @@ const toaster = createToaster({
 interface WalletProvider {
   name: string;
   icon?: string;
+  source: IntegrationSource;
   check: () => boolean;
-  getProvider: () => any;
 }
 
 const WALLET_PROVIDERS: WalletProvider[] = [
   {
     name: 'MetaMask',
     icon: 'https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg',
+    source: IntegrationSource.METAMASK,
     check: () => {
       if (window.ethereum?.providers?.length) {
-        return window.ethereum.providers.some((p: any) => p.isMetaMask);
+        return window.ethereum.providers.some((p: any) => p.isMetaMask) as boolean;
       }
       return window.ethereum?.isMetaMask || false;
-    },
-    getProvider: () => {
-      if (window.ethereum?.providers?.length) {
-        return window.ethereum.providers.find((p: any) => p.isMetaMask);
-      }
-      return window.ethereum;
     }
   },
   {
     name: 'Rabby',
     icon: 'https://rabby.io/assets/logo.png',
+    source: IntegrationSource.RABBY,
     check: () => {
       if (window.ethereum?.providers?.length) {
-        return window.ethereum.providers.some((p: any) => p.isRabby);
+        return window.ethereum.providers.some((p: any) => p.isRabby) as boolean;
       }
       return window.ethereum?.isRabby || false;
-    },
-    getProvider: () => {
-      if (window.ethereum?.providers?.length) {
-        return window.ethereum.providers.find((p: any) => p.isRabby);
-      }
-      return window.ethereum;
     }
   },
   {
     name: 'Coinbase Wallet',
+    source: IntegrationSource.COINBASE_WALLET,
     check: () => {
       if (window.ethereum?.providers?.length) {
-        return window.ethereum.providers.some((p: any) => p.isCoinbaseWallet);
+        return window.ethereum.providers.some((p: any) => p.isCoinbaseWallet) as boolean;
       }
       return window.ethereum?.isCoinbaseWallet || false;
-    },
-    getProvider: () => {
-      if (window.ethereum?.providers?.length) {
-        return window.ethereum.providers.find((p: any) => p.isCoinbaseWallet);
-      }
-      return window.ethereum;
     }
   },
   {
     name: 'Brave Wallet',
+    source: IntegrationSource.METAMASK, // Brave uses MetaMask-like interface
     check: () => {
       if (window.ethereum?.providers?.length) {
-        return window.ethereum.providers.some((p: any) => p.isBraveWallet);
+        return window.ethereum.providers.some((p: any) => p.isBraveWallet) as boolean;
       }
       return window.ethereum?.isBraveWallet || false;
-    },
-    getProvider: () => {
-      if (window.ethereum?.providers?.length) {
-        return window.ethereum.providers.find((p: any) => p.isBraveWallet);
-      }
-      return window.ethereum;
     }
   }
 ];
+
+// EVM chains to connect to
+const EVM_CHAINS = [
+  { chain: Chain.ETHEREUM, name: 'Ethereum' },
+  { chain: Chain.POLYGON, name: 'Polygon' },
+  { chain: Chain.BSC, name: 'BSC' },
+  { chain: Chain.ARBITRUM, name: 'Arbitrum' },
+  { chain: Chain.OPTIMISM, name: 'Optimism' },
+  { chain: Chain.AVALANCHE, name: 'Avalanche' },
+  { chain: Chain.BASE, name: 'Base' }
+];
+
+// Global wallet manager instance
+let walletManager: WalletManager | null = null;
 
 export default function MultiWalletConnect() {
   const [isConnecting, setIsConnecting] = useState(false);
@@ -109,145 +107,91 @@ export default function MultiWalletConnect() {
     setIsConnecting(true);
     
     try {
-      const provider = wallet.getProvider();
-      if (!provider) {
-        throw new Error(`${wallet.name} provider not found`);
+      // Initialize wallet manager if not already done
+      if (!walletManager) {
+        walletManager = new WalletManager();
       }
 
       console.log(`Connecting with ${wallet.name}...`);
       
-      // First request account access to ensure we have permission
-      const accounts = await provider.request({ 
-        method: 'eth_requestAccounts' 
-      });
-
-      if (accounts.length === 0) {
-        throw new Error('No accounts found');
-      }
-
-      // Map wallet name to IntegrationSource
-      const sourceMap: { [key: string]: IntegrationSource } = {
-        'MetaMask': IntegrationSource.METAMASK,
-        'Rabby': IntegrationSource.RABBY,
-        'Coinbase Wallet': IntegrationSource.COINBASE_WALLET,
-        'Brave Wallet': IntegrationSource.METAMASK // Brave uses MetaMask-like interface
-      };
+      // Create a new wallet instance
+      const walletInstance = await walletManager.addWallet(wallet.name);
+      const walletId = walletInstance.id;
       
-      const source = sourceMap[wallet.name] || IntegrationSource.METAMASK;
+      // Connect to each configured chain
+      const connectedChains: string[] = [];
+      const allAccounts = new Set<string>();
       
-      // First, let's detect which chains are configured in the wallet
-      const configuredChains: string[] = [];
-      const chainChecks = [
-        { chainId: '0x1', name: 'Ethereum' },
-        { chainId: '0x89', name: 'Polygon' },
-        { chainId: '0x38', name: 'BSC' },
-        { chainId: '0xa4b1', name: 'Arbitrum' },
-        { chainId: '0xa', name: 'Optimism' },
-        { chainId: '0xa86a', name: 'Avalanche' },
-        { chainId: '0x2105', name: 'Base' }
-      ];
-      
-      // Try to detect configured chains by attempting to switch to them
-      for (const chain of chainChecks) {
+      for (const { chain, name } of EVM_CHAINS) {
         try {
-          await provider.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: chain.chainId }]
-          });
-          configuredChains.push(chain.name);
-          console.log(`Chain ${chain.name} is configured`);
-        } catch (error: any) {
-          if (error.code === 4902) {
-            // Chain not added to wallet
-            console.log(`Chain ${chain.name} is not configured`);
-          } else if (error.code === 4001) {
-            // User rejected - stop checking
-            throw new Error('User rejected chain switch');
-          }
-        }
-      }
-      
-      if (configuredChains.length === 0) {
-        // At least Ethereum should be available
-        configuredChains.push('Ethereum');
-      }
-      
-      // Get current chain to restore later
-      const originalChainId = await provider.request({ method: 'eth_chainId' });
-      
-      try {
-        // For now, let's use the direct approach instead of wallet-integration-system
-        // due to Firefox multi-wallet issues with selectExtension
-        console.log(`Connecting ${wallet.name} directly...`);
-        
-        // Use the accounts we already have from eth_requestAccounts
-        console.log(`Found ${accounts.length} accounts from ${wallet.name}`);
-        
-        // Since we can't detect which accounts belong to which mnemonic automatically,
-        // we'll create separate entries for each account for now
-        // In a real implementation, the wallet would need to provide this information
-        
-        // For demonstration, we'll group all accounts under one "wallet" for now
-        // but in reality, these might come from different mnemonics
-        const connectionId = `connection-${wallet.name.toLowerCase()}-${Date.now()}`;
-        const walletId = `wallet-${wallet.name.toLowerCase()}-${Date.now()}`;
-        
-        // Add each account as a separate entry
-        accounts.forEach((address, index) => {
-          const accountId = `${connectionId}-account-${index}`;
+          console.log(`Attempting to connect to ${name}...`);
+          const connection = await walletManager.connectWallet(chain, wallet.source);
           
-          addAccount({
-            id: accountId,
-            type: 'wallet',
-            platform: 'Multi-Chain EVM',
-            label: `${wallet.name} Account ${index + 1}`,
-            address: address,
-            status: 'connected',
-            metadata: {
-              walletManagerId: walletId,
-              chains: configuredChains,
-              source: source,
-              walletType: wallet.name,
-              detectedChains: configuredChains,
-              currentChainId: parseInt(originalChainId, 16),
-              allAddresses: [address], // Single address per account entry
-              accountCount: 1,
-              walletId: walletId, // Groups accounts by wallet/mnemonic
-              connectionType: wallet.name, // MetaMask, Rabby, etc
-              walletLabel: `${wallet.name} Wallet 1` // Would need user input in real implementation
-            }
-          });
-        });
-        
-        toaster.create({
-          title: 'Wallet Connected',
-          description: `Connected ${accounts.length} ${wallet.name} account${accounts.length > 1 ? 's' : ''} across ${configuredChains.length} chain${configuredChains.length > 1 ? 's' : ''}`,
-          type: 'success',
-          duration: 5000,
-        });
-        
-        // Try to restore original chain
-        try {
-          await provider.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: originalChainId }]
-          });
-        } catch (e) {
-          console.error('Could not restore original chain:', e);
+          if (connection.connected && connection.accounts) {
+            connectedChains.push(name);
+            // Collect all unique accounts
+            connection.accounts.forEach(acc => allAccounts.add(acc.address));
+          }
+        } catch (error) {
+          // Chain might not be configured in wallet, skip it
+          console.log(`Could not connect to ${name}:`, error.message);
         }
-      } catch (error) {
-        throw error;
       }
-    } catch (error: any) {
+      
+      if (connectedChains.length === 0) {
+        throw new Error('Could not connect to any chains');
+      }
+      
+      const accountArray = Array.from(allAccounts);
+      console.log(`Connected to ${connectedChains.length} chains with ${accountArray.length} accounts`);
+      
+      // Add each account as a separate entry in our store
+      accountArray.forEach((address, index) => {
+        const accountId = `${walletId}-account-${index}`;
+        
+        addAccount({
+          id: accountId,
+          type: 'wallet',
+          platform: 'Multi-Chain EVM',
+          label: `${wallet.name} Account ${index + 1}`,
+          address: address,
+          status: 'connected',
+          metadata: {
+            walletManagerId: walletId,
+            chains: connectedChains,
+            source: wallet.source,
+            walletType: wallet.name,
+            detectedChains: connectedChains,
+            allAddresses: [address],
+            accountCount: 1,
+            walletId: walletId,
+            connectionType: wallet.name,
+            walletLabel: walletInstance.name || `${wallet.name} Wallet`,
+            useWalletManager: true // Flag to use WalletManager for fetching
+          }
+        });
+      });
+      
+      // Store wallet manager reference globally
+      (window as any).__cygnusWalletManager = walletManager as any;
+      
+      toaster.create({
+        title: 'Wallet Connected',
+        description: `Connected ${accountArray.length} ${wallet.name} account${accountArray.length > 1 ? 's' : ''} across ${connectedChains.length} chain${connectedChains.length > 1 ? 's' : ''}`,
+        type: 'success',
+        duration: 5000,
+      });
+    } catch (error) {
       console.error('Connection error:', error);
       
       let message = 'Failed to connect wallet';
-      if (error.code === 4001) {
+      const errorCode = (error as any).code;
+      if (errorCode === 4001) {
         message = 'You rejected the connection';
-      } else if (error.code === -32002) {
+      } else if (errorCode === -32002) {
         message = 'A connection request is already pending. Please check your wallet.';
-      } else if (error.message) {
-        message = error.message;
+      } else if ((error as any).message) {
+        message = (error as any).message;
       }
       
       toaster.create({
@@ -272,7 +216,7 @@ export default function MultiWalletConnect() {
           loadingText="Connecting..."
         >
           <FiExternalLink />
-          Multi-Wallet Connect
+          Multi-Chain Connect
         </Button>
       </Menu.Trigger>
       
