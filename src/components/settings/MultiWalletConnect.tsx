@@ -93,11 +93,22 @@ const WALLET_PROVIDERS: WalletProvider[] = [
   },
   // SUI Wallets
   {
-    name: 'Sui Wallet',
-    icon: 'https://sui.io/assets/img/sui-logo.svg',
+    name: 'Slush',
+    icon: 'https://slush.dev/favicon.svg',
+    source: IntegrationSource.SLUSH,
+    type: 'sui',
+    check: () => {
+      // Slush uses Wallet Standard, so we check for it differently
+      // For now, we'll assume it's available if no legacy Sui wallet is detected
+      return typeof window !== 'undefined' && !window.suiet;
+    }
+  },
+  {
+    name: 'Suiet',
+    icon: 'https://suiet.app/favicon.ico',
     source: IntegrationSource.SUIET,
     type: 'sui',
-    check: () => window.suiet !== undefined || window.sui !== undefined
+    check: () => window.suiet !== undefined
   }
 ];
 
@@ -211,60 +222,109 @@ export default function MultiWalletConnect() {
   };
 
   const handleSuiConnect = async (wallet: WalletProvider, walletId: string) => {
-    const provider = window.suiet || window.sui;
-    if (!provider) {
-      throw new Error('Sui wallet not found');
-    }
-
-    // Request permissions
-    await provider.requestPermissions();
-    
-    // Get accounts
-    const accounts = await provider.getAccounts();
-    if (!accounts || accounts.length === 0) {
-      throw new Error('No Sui accounts found');
-    }
-    
-    // Add each account
-    accounts.forEach((account: string, index: number) => {
-      addAccount({
-        id: `${walletId}-account-${index}`,
-        type: 'wallet',
-        platform: 'SUI',
-        label: `${wallet.name} Account ${index + 1}`,
-        address: account,
-        status: 'connected',
-        metadata: {
-          walletManagerId: walletId,
-          chains: ['SUI'],
-          source: wallet.source,
-          walletType: wallet.name,
-          detectedChains: ['SUI'],
-          allAddresses: [account],
-          accountCount: 1,
-          walletId: walletId,
-          connectionType: wallet.name,
-          walletLabel: `${wallet.name} Wallet`,
-          useWalletManager: false
-        }
+    try {
+      // Use WalletManager with the proper IntegrationSource
+      const { WalletManager, Chain } = await import('@cygnus-wealth/wallet-integration-system');
+      const { getPreferredRpcEndpoint } = await import('../../config/rpc');
+      
+      // Configure WalletManager with SUI RPC
+      const walletManager = new WalletManager({
+        rpcUrl: getPreferredRpcEndpoint('sui')
       });
-    });
-    
-    // Store connection info for balance fetching
-    (window as any).__cygnusConnections = (window as any).__cygnusConnections || {};
-    (window as any).__cygnusConnections[walletId] = {
-      provider: provider,
-      chains: ['SUI'],
-      accounts: accounts,
-      type: 'sui'
-    };
-    
-    toaster.create({
-      title: 'Wallet Connected',
-      description: `Connected ${accounts.length} ${wallet.name} account${accounts.length > 1 ? 's' : ''} on SUI`,
-      type: 'success',
-      duration: 5000,
-    });
+      
+      // Connect to the SUI wallet
+      const connection = await walletManager.connectWallet(Chain.SUI, wallet.source);
+      
+      if (!connection.accounts || connection.accounts.length === 0) {
+        throw new Error('No SUI accounts found');
+      }
+      
+      // Add each account
+      connection.accounts.forEach((account, index) => {
+        addAccount({
+          id: `${walletId}-account-${index}`,
+          type: 'wallet',
+          platform: 'SUI',
+          label: `${wallet.name} Account ${index + 1}`,
+          address: account.address,
+          status: 'connected',
+          metadata: {
+            walletManagerId: walletId,
+            chains: ['SUI'],
+            source: wallet.source,
+            walletType: wallet.name,
+            detectedChains: ['SUI'],
+            allAddresses: [account.address],
+            accountCount: 1,
+            walletId: walletId,
+            connectionType: wallet.name,
+            walletLabel: `${wallet.name} Wallet`,
+            useWalletManager: true, // Use WalletManager for balance fetching
+            walletManagerInstance: walletManager
+          }
+        });
+      });
+      
+      // Store the wallet manager instance for balance fetching
+      (window as any).__cygnusWalletManager = walletManager;
+      
+      toaster.create({
+        title: 'Wallet Connected',
+        description: `Connected ${connection.accounts.length} ${wallet.name} account${connection.accounts.length > 1 ? 's' : ''} on SUI`,
+        type: 'success',
+        duration: 5000,
+      });
+    } catch (error) {
+      console.error('Failed to connect SUI wallet:', error);
+      
+      // Fallback to legacy method for Suiet
+      if (wallet.source === IntegrationSource.SUIET && window.suiet) {
+        const provider = window.suiet;
+        
+        // Request permissions
+        await provider.requestPermissions();
+        
+        // Get accounts
+        const accounts = await provider.getAccounts();
+        if (!accounts || accounts.length === 0) {
+          throw new Error('No Sui accounts found');
+        }
+        
+        // Add each account
+        accounts.forEach((account: string, index: number) => {
+          addAccount({
+            id: `${walletId}-account-${index}`,
+            type: 'wallet',
+            platform: 'SUI',
+            label: `${wallet.name} Account ${index + 1}`,
+            address: account,
+            status: 'connected',
+            metadata: {
+              walletManagerId: walletId,
+              chains: ['SUI'],
+              source: wallet.source,
+              walletType: wallet.name,
+              detectedChains: ['SUI'],
+              allAddresses: [account],
+              accountCount: 1,
+              walletId: walletId,
+              connectionType: wallet.name,
+              walletLabel: `${wallet.name} Wallet`,
+              useWalletManager: false
+            }
+          });
+        });
+        
+        toaster.create({
+          title: 'Wallet Connected',
+          description: `Connected ${accounts.length} ${wallet.name} account${accounts.length > 1 ? 's' : ''} on SUI`,
+          type: 'success',
+          duration: 5000,
+        });
+      } else {
+        throw error;
+      }
+    }
   };
 
   const handleEvmConnect = async (wallet: WalletProvider, walletId: string) => {

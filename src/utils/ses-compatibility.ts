@@ -3,7 +3,7 @@
 
 // Check if we're in a SES lockdown environment
 export const isSESEnvironment = () => {
-  return typeof globalThis.lockdown === 'function' || 
+  return typeof (globalThis as any).lockdown === 'function' || 
          typeof (globalThis as any).harden === 'function';
 };
 

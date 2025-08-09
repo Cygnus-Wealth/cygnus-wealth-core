@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
@@ -30,11 +31,26 @@ export default defineConfig({
       transformMixedEsModules: true
     }
   },
+  resolve: {
+    alias: {
+      buffer: 'buffer'
+    }
+  },
+  define: {
+    global: 'globalThis'
+  },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.ts'],
     globals: true,
     exclude: ['node_modules', 'dist', '.idea', '.git', '.cache', 'e2e/**/*'],
+    deps: {
+      optimizer: {
+        web: {
+          include: ['@cygnus-wealth/wallet-integration-system']
+        }
+      }
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -53,13 +69,5 @@ export default defineConfig({
         statements: 80
       }
     }
-  },
-  resolve: {
-    alias: {
-      buffer: 'buffer'
-    }
-  },
-  define: {
-    global: 'globalThis'
   }
 });

@@ -16,7 +16,7 @@ export default function WalletDiagnostics() {
       console.log('networkVersion:', window.ethereum.networkVersion);
       
       // Check for providers array (multiple wallets)
-      if (window.ethereum.providers) {
+      if (window.ethereum.providers && Array.isArray(window.ethereum.providers)) {
         console.log('Multiple providers found:', window.ethereum.providers.length);
         window.ethereum.providers.forEach((provider: any, index: number) => {
           console.log(`Provider ${index}:`, {
@@ -27,6 +27,8 @@ export default function WalletDiagnostics() {
             _metamask: !!provider._metamask
           });
         });
+      } else if (window.ethereum.providers) {
+        console.log('Providers property exists but is not an array:', typeof window.ethereum.providers);
       }
       
       // Try to access methods
@@ -44,10 +46,14 @@ export default function WalletDiagnostics() {
       console.log('window.ethereum.isBraveWallet:', window.ethereum.isBraveWallet);
       
       // Try a safe RPC call
-      console.log('\nTrying eth_chainId...');
-      window.ethereum.request({ method: 'eth_chainId' })
-        .then((chainId: string) => console.log('Current chain ID:', chainId))
-        .catch((error: any) => console.error('Error getting chain ID:', error));
+      if (typeof window.ethereum.request === 'function') {
+        console.log('\nTrying eth_chainId...');
+        window.ethereum.request({ method: 'eth_chainId' })
+          .then((chainId: string) => console.log('Current chain ID:', chainId))
+          .catch((error: any) => console.error('Error getting chain ID:', error));
+      } else {
+        console.log('Request method not available');
+      }
     } else {
       console.log('No ethereum provider found!');
     }

@@ -99,3 +99,55 @@ A serverless, client-side dApp for multi-chain portfolio tracking that emphasize
 - ZK proofs for enhanced privacy when needed
 
 The application is in early bootstrap phase with core dependencies installed but main implementation not yet started.
+
+## DDD Architecture Agent Guidelines
+
+When working on this codebase, use the appropriate Domain-Driven Design agent for each task:
+
+### ddd-enterprise-architect
+Use for strategic architectural decisions:
+- Defining bounded contexts for CEX, DEX, and wallet integrations
+- Establishing communication patterns between portfolio aggregation domains
+- Designing microservice boundaries for future scaling
+- Creating ubiquitous language for financial domain concepts
+- Aligning technical architecture with business goals
+
+### ddd-domain-architect  
+Use for domain-specific implementations:
+- Translating enterprise patterns into the portfolio tracking domain
+- Defining aggregates for wallet, transaction, and portfolio entities
+- Establishing contracts between CEX/DEX integration modules
+- Implementing repository patterns for multi-chain data access
+- Adapting decentralization principles to specific domain requirements
+
+### ddd-system-architect
+Use for internal system design:
+- Designing module structure for wallet connection features
+- Selecting state management libraries (Zustand vs alternatives)
+- Planning E2E test scenarios for multi-chain interactions
+- Evaluating Web3 library choices for each blockchain
+- Ensuring client-side sovereignty in system architecture
+
+### ddd-unit-architect
+Use for granular code architecture:
+- Designing TypeScript classes for encryption services
+- Creating file structures for React components
+- Defining interfaces for wallet adapters
+- Planning unit test specifications for domain logic
+- Structuring value objects for cryptocurrency amounts
+
+### ddd-software-engineer
+Use for implementation tasks:
+- Implementing architectural designs into TypeScript/React code
+- Writing unit tests with Vitest for domain services
+- Creating value objects and domain entities
+- Implementing repository patterns for data access
+- Translating unit architect specifications into working code
+
+### code-review-expert
+Use after implementing features:
+- Review newly written wallet connection handlers
+- Analyze security of encryption implementations
+- Check React component best practices
+- Verify TypeScript type safety
+- Ensure adherence to DDD patterns

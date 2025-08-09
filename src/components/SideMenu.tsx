@@ -55,7 +55,6 @@ export default function SideMenu({ onCollapseChange }: SideMenuProps = {}) {
         variant="ghost"
         w="full"
         justifyContent={isCollapsed ? 'center' : 'flex-start'}
-        leftIcon={!isCollapsed ? <Icon size={20} /> : undefined}
         bg={active ? 'blue.50' : 'transparent'}
         color={active ? 'blue.600' : 'gray.700'}
         _hover={{
@@ -79,6 +78,7 @@ export default function SideMenu({ onCollapseChange }: SideMenuProps = {}) {
           </>
         ) : (
           <>
+            <Icon size={20} />
             <Text>{item.label}</Text>
             <Box
               position="absolute"
@@ -120,7 +120,6 @@ export default function SideMenu({ onCollapseChange }: SideMenuProps = {}) {
             )}
             <IconButton
               aria-label="Toggle Sidebar"
-              icon={isCollapsed ? <FiChevronRight /> : <FiChevronLeft />}
               variant="ghost"
               size="sm"
               onClick={() => {
@@ -128,17 +127,19 @@ export default function SideMenu({ onCollapseChange }: SideMenuProps = {}) {
                 setIsCollapsed(newCollapsed);
                 onCollapseChange?.(newCollapsed);
               }}
-            />
+            >
+              {isCollapsed ? <FiChevronRight /> : <FiChevronLeft />}
+            </IconButton>
           </Flex>
         </Box>
 
         {/* Menu Items */}
-        <Stack spacing={2} p={3} flex="1">
+        <Stack gap={2} p={3} flex="1">
           {menuItems.map((item) => (
             <Box key={item.id}>
               <MenuButton item={item} />
               {item.subItems && location.pathname.startsWith(item.path) && !isCollapsed && (
-                <Stack spacing={1} ml={4} mt={1}>
+                <Stack gap={1} ml={4} mt={1}>
                   {item.subItems.map((subItem) => (
                     <Button
                       key={subItem.id}
@@ -172,7 +173,6 @@ export default function SideMenu({ onCollapseChange }: SideMenuProps = {}) {
     <>
       <IconButton
         aria-label="Open Menu"
-        icon={<FiMenu />}
         position="fixed"
         top="4"
         left="4"
@@ -182,7 +182,9 @@ export default function SideMenu({ onCollapseChange }: SideMenuProps = {}) {
         shadow="md"
         zIndex="1000"
         _hover={{ bg: 'gray.100' }}
-      />
+      >
+        <FiMenu />
+      </IconButton>
 
       <Drawer.Root open={isOpen} placement="start" onOpenChange={(e) => setIsOpen(e.open)}>
         <Portal>
@@ -197,15 +199,16 @@ export default function SideMenu({ onCollapseChange }: SideMenuProps = {}) {
                   <Drawer.CloseTrigger asChild>
                     <IconButton
                       aria-label="Close menu"
-                      icon={<FiX />}
                       variant="ghost"
                       size="sm"
-                    />
+                    >
+                      <FiX />
+                    </IconButton>
                   </Drawer.CloseTrigger>
                 </Flex>
               </Drawer.Header>
               <Drawer.Body p={0}>
-                <Stack spacing={0}>
+                <Stack gap={0}>
                   {menuItems.map((item) => {
                     const Icon = item.icon;
                     const active = isActive(item.path);
@@ -232,7 +235,7 @@ export default function SideMenu({ onCollapseChange }: SideMenuProps = {}) {
                           {item.label}
                         </Button>
                         {item.subItems && location.pathname.startsWith(item.path) && (
-                          <Stack spacing={0}>
+                          <Stack gap={0}>
                             {item.subItems.map((subItem) => (
                               <Button
                                 key={subItem.id}

@@ -1,0 +1,51 @@
+# Page snapshot
+
+```yaml
+- paragraph: CygnusWealth
+- button "Toggle Sidebar":
+  - img
+- link "Dashboard":
+  - /url: /
+  - img
+  - paragraph: Dashboard
+- link "Settings":
+  - /url: /settings
+  - img
+  - paragraph: Settings
+- heading "Portfolio Dashboard" [level=1]
+- paragraph: Your complete crypto portfolio overview
+- heading "Portfolio Summary" [level=2]
+- term: Total Portfolio Value
+- definition: $0.00
+- text: USD
+- term: Total Assets
+- definition: "0"
+- text: Across all accounts
+- term: Connected Accounts
+- definition: "0"
+- link "Add accounts":
+  - /url: /settings/connections
+- heading "Assets" [level=2]
+- img
+- paragraph: Show zero balances
+- checkbox [checked]
+- table:
+  - rowgroup:
+    - row "Asset Balance Source Chain Price (USD) Value (USD)":
+      - cell "Asset"
+      - cell "Balance"
+      - cell "Source"
+      - cell "Chain"
+      - cell "Price (USD)"
+      - cell "Value (USD)"
+  - rowgroup:
+    - row "No assets to display Add accounts to start tracking your portfolio Go to Settings → Connections":
+      - cell "No assets to display Add accounts to start tracking your portfolio Go to Settings → Connections":
+        - img
+        - paragraph: No assets to display
+        - paragraph: Add accounts to start tracking your portfolio
+        - link "Go to Settings → Connections":
+          - /url: /settings/connections
+          - img
+          - text: Go to Settings → Connections
+```

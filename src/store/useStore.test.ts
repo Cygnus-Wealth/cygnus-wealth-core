@@ -121,6 +121,8 @@ describe('useStore', () => {
         balance: '1.5',
         chain: 'Ethereum',
         source: 'wallet',
+        priceUsd: 2000,
+        valueUsd: 3000,
       };
 
       useStore.getState().addAsset(asset);
@@ -145,6 +147,8 @@ describe('useStore', () => {
         balance: '1.5',
         chain: 'Ethereum',
         source: 'wallet',
+        priceUsd: 2000,
+        valueUsd: 3000,
       };
 
       useStore.getState().addAsset(asset);
@@ -164,6 +168,8 @@ describe('useStore', () => {
           balance: '1.5',
           chain: 'Ethereum',
           source: 'wallet',
+          priceUsd: 2000,
+          valueUsd: 3000,
         },
         {
           id: 'asset-2',
@@ -173,6 +179,8 @@ describe('useStore', () => {
           balance: '1000',
           chain: 'Ethereum',
           source: 'wallet',
+          priceUsd: 1,
+          valueUsd: 1000,
         },
         {
           id: 'asset-3',
@@ -182,6 +190,8 @@ describe('useStore', () => {
           balance: '0.5',
           chain: 'Bitcoin',
           source: 'wallet',
+          priceUsd: 50000,
+          valueUsd: 25000,
         },
       ];
 
@@ -237,6 +247,8 @@ describe('useStore', () => {
           balance: '1.5',
           chain: 'Ethereum',
           source: 'wallet',
+          priceUsd: 2000,
+          valueUsd: 3000,
         },
         {
           id: 'asset-2',
@@ -246,6 +258,8 @@ describe('useStore', () => {
           balance: '1000',
           chain: 'Ethereum',
           source: 'wallet',
+          priceUsd: 1,
+          valueUsd: 1000,
         },
       ];
 
@@ -263,6 +277,8 @@ describe('useStore', () => {
           balance: '1.5',
           chain: 'Ethereum',
           source: 'wallet',
+          priceUsd: 2000,
+          valueUsd: 3000,
         },
         {
           id: 'asset-2',
@@ -272,6 +288,8 @@ describe('useStore', () => {
           balance: '1000',
           chain: 'Ethereum',
           source: 'wallet',
+          priceUsd: 1,
+          valueUsd: 1000,
         },
         {
           id: 'asset-3',
@@ -281,6 +299,8 @@ describe('useStore', () => {
           balance: '0.5',
           chain: 'Bitcoin',
           source: 'wallet',
+          priceUsd: 50000,
+          valueUsd: 25000,
         },
       ];
 

@@ -1,5 +1,4 @@
-import { WalletManager, WalletIntegrationConfig } from '@cygnus-wealth/wallet-integration-system';
-import { getPreferredRpcEndpoint } from '../config/rpc';
+import { WalletManager } from '@cygnus-wealth/wallet-integration-system';
 
 let walletManagerInstance: WalletManager | null = null;
 
@@ -8,13 +7,9 @@ let walletManagerInstance: WalletManager | null = null;
  */
 export function getWalletManager(): WalletManager {
   if (!walletManagerInstance) {
-    // For now, we'll use the first Solana RPC endpoint as the default
-    // The wallet-integration-system will use this for Solana connections
-    const config: WalletIntegrationConfig = {
-      rpcUrl: getPreferredRpcEndpoint('solana')
-    };
-    
-    walletManagerInstance = new WalletManager(config);
+    // Let wallet-integration-system handle RPC configuration internally
+    // It will use WebSocket connections as the primary method
+    walletManagerInstance = new WalletManager();
     
     // Store it globally for access from hooks
     (window as any).__cygnusWalletManager = walletManagerInstance;
@@ -24,11 +19,10 @@ export function getWalletManager(): WalletManager {
 }
 
 /**
- * Update the RPC configuration for the WalletManager
+ * Reset the WalletManager instance
+ * This can be useful if you need to reinitialize connections
  */
-export function updateWalletManagerRpc(rpcUrl: string): void {
-  // Create a new instance with updated config
-  const config: WalletIntegrationConfig = { rpcUrl };
-  walletManagerInstance = new WalletManager(config);
-  (window as any).__cygnusWalletManager = walletManagerInstance;
+export function resetWalletManager(): void {
+  walletManagerInstance = null;
+  delete (window as any).__cygnusWalletManager;
 }

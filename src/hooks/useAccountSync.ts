@@ -7,10 +7,11 @@ import { formatBalance } from '../utils/formatters';
 import type { Asset } from '../store/useStore';
 import { 
   WalletManager, 
-  Chain 
+  Chain,
+  SolanaWalletIntegration,
+  SuiWalletIntegration,
+  IntegrationSource
 } from '@cygnus-wealth/wallet-integration-system';
-import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { getFullnodeUrl, SuiClient } from '@mysten/sui.js/client';
 
 const assetValuator = new AssetValuator();
 
@@ -74,7 +75,7 @@ export function useAccountSync() {
 
       setIsLoading(true);
       const allAssets: Asset[] = [];
-
+      
       // Check if we have a wallet manager instance
       const walletManager = (window as any).__cygnusWalletManager as WalletManager | undefined;
 
@@ -107,29 +108,29 @@ export function useAccountSync() {
                 if (!chainConfig) continue;
                 
                 // Skip zero balances for native tokens
-                if (balance.balance === '0' && balance.assetType === 'NATIVE') continue;
+                if (balance.amount === '0' && balance.asset.type === 'NATIVE') continue;
                 
                 // Get price for the asset
                 let priceData = { price: 0 };
                 try {
-                  const symbol = balance.symbol || chainConfig.symbol;
+                  const symbol = balance.asset.symbol || chainConfig.symbol;
                   priceData = await assetValuator.getPrice(symbol, 'USD');
                   updatePrice(symbol, priceData.price);
                 } catch {
-                  console.warn(`Price not available for ${balance.symbol}`);
+                  console.warn(`Price not available for ${balance.asset.symbol}`);
                 }
                 
                 // Format balance
                 const formattedBalance = formatBalance(
-                  balance.balance,
-                  balance.decimals || 18
+                  balance.amount,
+                  balance.asset.decimals || 18
                 );
                 
                 // Create asset entry
                 const asset: Asset = {
-                  id: `${account.id}-${balance.symbol}-${chainName}-${balance.assetId}`,
-                  symbol: balance.symbol || chainConfig.symbol,
-                  name: balance.name || chainConfig.name,
+                  id: `${account.id}-${balance.asset.symbol}-${chainName}-${balance.assetId}`,
+                  symbol: balance.asset.symbol || chainConfig.symbol,
+                  name: balance.asset.name || chainConfig.name,
                   balance: formattedBalance,
                   source: account.label,
                   chain: chainName,
@@ -235,107 +236,93 @@ export function useAccountSync() {
               const validAssets = results.filter((asset): asset is Asset => asset !== null);
               allAssets.push(...validAssets);
             } else if (account.platform === 'Solana') {
-              // Handle Solana accounts
+              // Use wallet-integration-system's built-in Solana support
               try {
-                // Use configured RPC endpoints from the app config
-                const { getRpcEndpoints } = await import('../config/rpc');
-                const rpcEndpoints = getRpcEndpoints('solana');
+                // Create integration - the wallet-integration-system now handles everything properly
+                const solanaIntegration = new SolanaWalletIntegration(
+                  Chain.SOLANA,
+                  IntegrationSource.PHANTOM
+                );
                 
-                let connection: Connection | null = null;
-                let lastError: any = null;
+                // Connect and get balances
+                await solanaIntegration.connect();
+                const balances = await solanaIntegration.getBalances();
                 
-                // Try each endpoint until one works
-                for (const endpoint of rpcEndpoints) {
-                  try {
-                    connection = new Connection(endpoint, {
-                      commitment: 'confirmed',
-                      httpHeaders: {
-                        'Content-Type': 'application/json',
-                      }
-                    });
-                    
-                    // Test the connection
-                    await connection.getLatestBlockhash();
-                    console.log(`Using Solana RPC endpoint: ${endpoint}`);
-                    break;
-                  } catch (error) {
-                    console.warn(`Failed to connect to ${endpoint}:`, error);
-                    lastError = error;
-                  }
-                }
-                
-                if (!connection) {
-                  throw new Error(`All Solana RPC endpoints failed. Last error: ${lastError?.message}`);
-                }
-                
-                const publicKey = new PublicKey(account.address);
-                
-                // Get SOL balance
-                const balance = await connection.getBalance(publicKey);
-                const solBalance = balance / LAMPORTS_PER_SOL;
-                
-                // Skip if balance is 0
-                if (solBalance === 0) {
-                  console.log(`Skipping zero balance for Solana account ${account.address}`);
-                } else {
-                  // Get SOL price
-                  const priceData = await assetValuator.getPrice('SOL', 'USD');
-                  updatePrice('SOL', priceData.price);
+                // Process each balance
+                for (const balance of balances) {
+                  if (balance.amount === '0') continue;
                   
-                  // Create asset entry
+                  // Get price from asset valuator
+                  const priceData = await assetValuator.getPrice(balance.asset.symbol, 'USD');
+                  updatePrice(balance.asset.symbol, priceData.price);
+                  
                   const asset: Asset = {
-                    id: `${account.id}-SOL-solana`,
-                    symbol: 'SOL',
-                    name: 'Solana',
-                    balance: solBalance.toString(),
+                    id: `${account.id}-${balance.asset.symbol}-solana`,
+                    symbol: balance.asset.symbol,
+                    name: balance.asset.name || balance.asset.symbol,
+                    balance: balance.amount,
                     source: account.label,
                     chain: 'Solana',
                     accountId: account.id,
                     priceUsd: priceData.price,
-                    valueUsd: solBalance * priceData.price
+                    valueUsd: parseFloat(balance.amount) * priceData.price
+                  };
+                  
+                  allAssets.push(asset);
+                }
+              } catch (error) {
+                console.error(`Failed to fetch Solana balances for ${account.address}:`, error);
+              }
+              
+            } else if (account.platform === 'SUI') {
+              // Use wallet-integration-system's built-in SUI support
+              try {
+                // Create integration - the wallet-integration-system now handles everything properly
+                const suiIntegration = new SuiWalletIntegration(
+                  Chain.SUI,
+                  IntegrationSource.SUIET
+                );
+                
+                // Connect and get balances
+                await suiIntegration.connect();
+                const balances = await suiIntegration.getBalances();
+                
+                // Process each balance
+                for (const balance of balances) {
+                  if (balance.amount === '0') continue;
+                  
+                  // Get price from asset valuator
+                  const priceData = await assetValuator.getPrice(balance.asset.symbol, 'USD');
+                  updatePrice(balance.asset.symbol, priceData.price);
+                  
+                  const asset: Asset = {
+                    id: `${account.id}-${balance.asset.symbol}-sui`,
+                    symbol: balance.asset.symbol,
+                    name: balance.asset.name || balance.asset.symbol,
+                    balance: balance.amount,
+                    source: account.label,
+                    chain: 'SUI',
+                    accountId: account.id,
+                    priceUsd: priceData.price,
+                    valueUsd: parseFloat(balance.amount) * priceData.price
                   };
                   
                   allAssets.push(asset);
                 }
                 
-                // TODO: Fetch SPL token balances
+                // Optional: Subscribe to real-time updates
+                if (account.metadata?.enableRealTimeUpdates) {
+                  await suiIntegration.subscribeToBalances(
+                    account.address,
+                    (updatedBalances) => {
+                      console.log('SUI balance update:', updatedBalances);
+                      // Handle real-time updates if needed
+                    }
+                  );
+                }
               } catch (error) {
-                console.error(`Failed to fetch Solana balance for ${account.address}:`, error);
-                // Continue with other accounts instead of throwing
+                console.error(`Failed to fetch SUI balances for ${account.address}:`, error);
               }
-              
-            } else if (account.platform === 'SUI') {
-              // Handle SUI accounts
-              const client = new SuiClient({ url: getFullnodeUrl('mainnet') });
-              
-              // Get SUI balance
-              const balance = await client.getBalance({
-                owner: account.address,
-                coinType: '0x2::sui::SUI'
-              });
-              
-              const suiBalance = parseInt(balance.totalBalance) / 1e9; // SUI has 9 decimals
-              
-              // Get SUI price
-              const priceData = await assetValuator.getPrice('SUI', 'USD');
-              updatePrice('SUI', priceData.price);
-              
-              // Create asset entry
-              const asset: Asset = {
-                id: `${account.id}-SUI-sui`,
-                symbol: 'SUI',
-                name: 'Sui',
-                balance: suiBalance.toString(),
-                source: account.label,
-                chain: 'SUI',
-                accountId: account.id,
-                priceUsd: priceData.price,
-                valueUsd: suiBalance * priceData.price
-              };
-              
-              allAssets.push(asset);
-              
-              // TODO: Fetch other SUI tokens
               
             } else {
               // Legacy EVM single-chain handling
@@ -408,7 +395,7 @@ export function useAccountSync() {
                         tokenValueUsd = parseFloat(tokenBalanceFormatted) * tokenPrice;
                       } catch {
                         console.warn(`Price not available for ${token.symbol}. You may need to update the token symbol mapping in asset-valuator.`);
-                        console.debug('Price fetch error:', priceError);
+                        // Price fetch error already logged above
                       }
                     } else {
                       // For zero balance tokens, set price and value to 0
@@ -459,5 +446,5 @@ export function useAccountSync() {
     const interval = setInterval(syncAccounts, 60000);
     
     return () => clearInterval(interval);
-  }, [walletAccounts.length]);
+  }, [accounts.length]); // Only re-run when number of accounts changes
 }

@@ -157,7 +157,7 @@ export default function Dashboard() {
                   {connectedAccounts}
                 </Stat.ValueText>
                 <Stat.HelpText>
-                  <Button as={Link} to="/settings/connections" size="sm" variant="link" colorScheme="blue">
+                  <Button as={Link} to="/settings/connections" size="sm" variant="plain" colorScheme="blue">
                     {connectedAccounts === 0 ? 'Add accounts' : 'Manage'}
                   </Button>
                 </Stat.HelpText>
@@ -300,8 +300,9 @@ export default function Dashboard() {
                             as={Link}
                             to="/settings/connections"
                             colorScheme="blue"
-                            leftIcon={<FiPlus />}
                           >
+                            <FiPlus />
+                          
                             Go to Settings → Connections
                           </Button>
                         </Stack>
@@ -323,7 +324,7 @@ export default function Dashboard() {
                     </Text>
                   )}
                 </Text>
-                <Stack direction="row" spacing={2}>
+                <Stack direction="row" gap={2}>
                   <IconButton
                     aria-label="Previous page"
                     size="sm"

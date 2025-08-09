@@ -49,6 +49,9 @@ describe('useAccountSync', () => {
     // Don't use fake timers to avoid infinite loops
     vi.useRealTimers();
     
+    // Mock console.log to prevent debug output in tests
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    
     // Reset store
     useStore.setState({
       accounts: [],
@@ -92,6 +95,7 @@ describe('useAccountSync', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe('Initial Sync', () => {
