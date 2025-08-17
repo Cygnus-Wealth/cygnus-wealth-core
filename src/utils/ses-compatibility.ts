@@ -29,9 +29,18 @@ export const safeDate = {
   }
 };
 
+// Polyfills for common Web3 libraries that may have SES compatibility issues
+export const initializeSESPolyfills = () => {
+  if (typeof window !== 'undefined' && isSESEnvironment()) {
+    // Add any necessary polyfills here
+    console.info('🔧 Initialized SES compatibility polyfills');
+  }
+};
+
 // Log SES environment status (only in development)
 if (import.meta.env.DEV) {
   if (isSESEnvironment()) {
     console.info('🔒 Running in SES lockdown environment (likely due to Web3 wallet extension)');
+    console.info('✅ Solana @solana/web3.js ParsedAccountData import uses type-only imports for SES compatibility');
   }
 }

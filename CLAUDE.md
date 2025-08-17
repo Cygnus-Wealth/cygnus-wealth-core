@@ -104,6 +104,16 @@ The application is in early bootstrap phase with core dependencies installed but
 
 When working on this codebase, use the appropriate Domain-Driven Design agent for each task:
 
+### Agent Workflow Pipeline
+
+**IMPORTANT: For all feature implementation requests, follow this hierarchical workflow:**
+
+1. **Start with ddd-system-architect** → Designs the module structure and integration approach
+2. **Pass system architect output to ddd-unit-architect** → Creates detailed file structures, classes, and test specifications based on system design
+3. **Pass unit architect output to ddd-software-engineer** → Implements the actual code following the unit specifications
+
+Each agent should explicitly reference and build upon the previous agent's output, creating a traceable chain of architectural decisions from high-level system design down to implementation details.
+
 ### ddd-enterprise-architect
 Use for strategic architectural decisions:
 - Defining bounded contexts for CEX, DEX, and wallet integrations
@@ -119,30 +129,39 @@ Use for domain-specific implementations:
 - Establishing contracts between CEX/DEX integration modules
 - Implementing repository patterns for multi-chain data access
 - Adapting decentralization principles to specific domain requirements
+- Architecture be reviewed by the ddd-enterprise-architect to ensure it meets all requirements and adheres to the design
 
 ### ddd-system-architect
-Use for internal system design:
+**Primary entry point for feature requests.** Use for internal system design:
 - Designing module structure for wallet connection features
 - Selecting state management libraries (Zustand vs alternatives)
 - Planning E2E test scenarios for multi-chain interactions
 - Evaluating Web3 library choices for each blockchain
 - Ensuring client-side sovereignty in system architecture
+- Architecture be reviewed by the ddd-domain-architect to ensure it meets all requirements and adheres to the design
+- **Output**: Provides architectural comments and requirements that must be passed to the unit architect
 
 ### ddd-unit-architect
-Use for granular code architecture:
+**Receives input from system architect.** Use for granular code architecture:
 - Designing TypeScript classes for encryption services
 - Creating file structures for React components
 - Defining interfaces for wallet adapters
 - Planning unit test specifications for domain logic
 - Structuring value objects for cryptocurrency amounts
+- Architecture be reviewed by the ddd-system-architect to ensure it meets all requirements and adheres to the design
+- **Input**: System architect's comments and requirements
+- **Output**: Detailed specifications and requirements for the software engineer
 
 ### ddd-software-engineer
-Use for implementation tasks:
+**Receives input from unit architect.** Use for implementation tasks:
 - Implementing architectural designs into TypeScript/React code
 - Writing unit tests with Vitest for domain services
 - Creating value objects and domain entities
 - Implementing repository patterns for data access
 - Translating unit architect specifications into working code
+- Code should be reviewed by the ddd-unit-architect to ensure it meets all requirements and adheres to the design
+- **Input**: Unit architect's detailed specifications and requirements
+- **Output**: Working, tested code that follows all architectural guidelines
 
 ### code-review-expert
 Use after implementing features:
@@ -151,3 +170,16 @@ Use after implementing features:
 - Check React component best practices
 - Verify TypeScript type safety
 - Ensure adherence to DDD patterns
+
+### Commits
+- Commits should be atomic and follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) format
+- Commit messages should be written in the imperative mood
+- Commits should be reviewed by the code-review-expert before merging to main
+- Commits should not reference claude.
+
+### Example Workflow
+
+When a user requests "Implement wallet connection for Ethereum":
+1. **System Architect**: Designs module structure, chooses ethers.js vs viem, defines integration points
+2. **Unit Architect**: Takes system design, creates WalletAdapter interface, EthereumWallet class structure, test specs
+3. **Software Engineer**: Takes unit specs, implements the actual TypeScript code with tests

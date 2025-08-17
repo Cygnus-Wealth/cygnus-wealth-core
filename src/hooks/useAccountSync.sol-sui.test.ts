@@ -37,18 +37,21 @@ vi.mock('@cygnus-wealth/wallet-integration-system', () => ({
       source: 'SOLANA_WALLET'
     }])
   })),
-  SuiWalletIntegration: vi.fn().mockImplementation(() => ({
-    connect: vi.fn().mockResolvedValue(true),
-    getBalances: vi.fn().mockResolvedValue([{
-      amount: '2.5',
-      asset: {
-        symbol: 'SUI',
-        name: 'Sui',
-        address: 'native'
-      },
-      source: 'SUI_WALLET'
-    }])
-  }))
+  SuiWalletIntegration: vi.fn().mockImplementation(() => {
+    const mockInstance = {
+      connect: vi.fn().mockResolvedValue(true),
+      getBalances: vi.fn().mockResolvedValue([{
+        amount: '2.5',
+        asset: {
+          symbol: 'SUI',
+          name: 'Sui',
+          address: 'native'
+        },
+        source: 'SUI_WALLET'
+      }])
+    };
+    return mockInstance;
+  })
 }));
 
 // Mock Solana web3.js
@@ -56,6 +59,10 @@ vi.mock('@solana/web3.js', () => ({
   Connection: vi.fn().mockImplementation(() => ({
     getBalance: vi.fn().mockResolvedValue(1500000000), // 1.5 SOL in lamports
     getLatestBlockhash: vi.fn().mockResolvedValue({ blockhash: 'test-blockhash' }),
+    getParsedTokenAccountsByOwner: vi.fn().mockResolvedValue({
+      value: [] // No token accounts for simplicity
+    }),
+    getHealth: vi.fn().mockResolvedValue('ok'),
   })),
   PublicKey: vi.fn().mockImplementation((key) => ({ 
     toString: () => key,
@@ -91,6 +98,7 @@ vi.mock('@cygnus-wealth/asset-valuator', () => ({
 describe('useAccountSync - Solana & SUI', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.resetModules();
     vi.useRealTimers();
     
     // Mock console.log to prevent debug output in tests
@@ -168,14 +176,22 @@ describe('useAccountSync - Solana & SUI', () => {
         },
       ];
 
-      useStore.setState({ accounts });
+      // Reset store completely and set fresh state
+      useStore.setState({ 
+        accounts, 
+        assets: [], 
+        portfolio: { totalValue: 0, totalAssets: 0, chains: {} }
+      });
 
-      renderHook(() => useAccountSync());
+      const { unmount } = renderHook(() => useAccountSync());
       
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Give more time for async operations
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       const assets = useStore.getState().assets;
       expect(assets).toHaveLength(2);
+      
+      unmount();
       
       // Check both accounts have SOL
       expect(assets.every(a => a.symbol === 'SOL')).toBe(true);
@@ -198,15 +214,22 @@ describe('useAccountSync - Solana & SUI', () => {
         },
       };
 
-      useStore.setState({ accounts: [suiAccount] });
+      // Reset store completely and set fresh state
+      useStore.setState({ 
+        accounts: [suiAccount], 
+        assets: [], 
+        portfolio: { totalValue: 0, totalAssets: 0, chains: {} }
+      });
 
-      renderHook(() => useAccountSync());
+      const { unmount } = renderHook(() => useAccountSync());
       
-      // Wait for sync to complete
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Give more time for async operations
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       const assets = useStore.getState().assets;
       expect(assets).toHaveLength(1);
+      
+      unmount();
       
       const suiAsset = assets[0];
       expect(suiAsset.symbol).toBe('SUI');

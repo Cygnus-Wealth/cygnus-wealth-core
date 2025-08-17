@@ -35,7 +35,18 @@ vi.mock('viem', async () => {
 // Mock the asset valuator
 vi.mock('@cygnus-wealth/asset-valuator', () => ({
   AssetValuator: vi.fn().mockImplementation(() => ({
-    getPrice: vi.fn().mockResolvedValue({ price: 2000 }),
+    getPrice: vi.fn().mockImplementation((symbol) => {
+      // Return different prices based on symbol, but always resolve successfully
+      const prices: Record<string, number> = {
+        'ETH': 2000,
+        'MATIC': 1,
+        'BNB': 300,
+        'AVAX': 20,
+        'SOL': 50,
+        'SUI': 1.2
+      };
+      return Promise.resolve({ price: prices[symbol] || 100 });
+    }),
     fetchTokenPrice: vi.fn().mockResolvedValue({ price: 2000 }),
   })),
 }));
@@ -46,6 +57,7 @@ global.fetch = vi.fn();
 describe('useAccountSync', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.resetModules();
     // Don't use fake timers to avoid infinite loops
     vi.useRealTimers();
     
