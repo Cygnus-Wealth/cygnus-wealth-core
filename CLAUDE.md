@@ -175,7 +175,7 @@ Use after implementing features:
 - Commits should be atomic and follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) format
 - Commit messages should be written in the imperative mood
 - Commits should be reviewed by the code-review-expert before merging to main
-- Commits should not reference claude.
+- Commits should not reference "co-authored by claude".
 
 ### Example Workflow
 

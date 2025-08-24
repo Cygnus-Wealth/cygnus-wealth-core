@@ -19,6 +19,9 @@ import { Link } from 'react-router-dom';
 import { FiChevronLeft, FiChevronRight, FiPlus, FiEye, FiEyeOff } from 'react-icons/fi';
 import { useStore } from '../store/useStore';
 import { useAccountSync } from '../hooks/useAccountSync';
+import { useProgressiveAssetLoading } from '../hooks/useProgressiveAssetLoading';
+import { SimpleBalanceCell } from './dashboard/SimpleBalanceCell';
+import { ValueCell } from './dashboard/ValueCell';
 import type { Asset } from '../store/useStore';
 
 const ITEMS_PER_PAGE = 10;
@@ -32,11 +35,14 @@ export default function Dashboard() {
     accounts, 
     assets, 
     portfolio, 
-    isLoading 
+    prices
   } = useStore();
   
   // Sync account balances
   useAccountSync();
+  
+  // Progressive loading for individual assets
+  const { getLoadingState, getOverallStatus } = useProgressiveAssetLoading(assets);
   
   // Get connected accounts count
   const connectedAccounts = accounts.filter(acc => acc.status === 'connected').length;
@@ -191,7 +197,14 @@ export default function Dashboard() {
                     }}
                   />
                 </Flex>
-                {isLoading && <Spinner size="sm" color="blue.500" />}
+                {(getOverallStatus().isLoadingAnyBalance || getOverallStatus().isLoadingAnyPrice) && (
+                  <Flex align="center" gap={2}>
+                    <Spinner size="xs" color="blue.500" />
+                    <Text fontSize="xs" color="gray.500">
+                      Loading {getOverallStatus().isLoadingAnyBalance ? 'balances' : 'prices'}...
+                    </Text>
+                  </Flex>
+                )}
               </Flex>
             </Box>
 
@@ -227,8 +240,13 @@ export default function Dashboard() {
                               <Text fontSize="sm" color="gray.600">{asset.name}</Text>
                             </Stack>
                           </Table.Cell>
-                          <Table.Cell textAlign="right" fontFamily="mono">
-                            {asset.balance}
+                          <Table.Cell textAlign="right">
+                            <SimpleBalanceCell 
+                              balance={asset.balance}
+                              symbol={asset.symbol}
+                              isLoading={getLoadingState(asset.id).isLoadingBalance}
+                              hasError={!!getLoadingState(asset.id).balanceError}
+                            />
                           </Table.Cell>
                           <Table.Cell>
                             {showTooltip ? (
@@ -270,10 +288,28 @@ export default function Dashboard() {
                             </Badge>
                           </Table.Cell>
                           <Table.Cell textAlign="right">
-                            ${asset.priceUsd?.toFixed(2) || '-'}
+                            {getLoadingState(asset.id).isLoadingPrice ? (
+                              <Flex align="center" gap={1} justify="flex-end">
+                                <Spinner size="xs" color="blue.500" />
+                                <Text fontSize="xs" color="gray.500">Loading...</Text>
+                              </Flex>
+                            ) : (
+                              <Text fontFamily="mono">
+                                ${prices[asset.symbol]?.toFixed(2) || asset.priceUsd?.toFixed(2) || '-'}
+                              </Text>
+                            )}
                           </Table.Cell>
-                          <Table.Cell textAlign="right" fontWeight="semibold">
-                            ${asset.valueUsd?.toFixed(2) || '-'}
+                          <Table.Cell textAlign="right">
+                            <ValueCell 
+                              balance={asset.balance}
+                              priceUsd={prices[asset.symbol] || asset.priceUsd}
+                              valueUsd={asset.valueUsd}
+                              isLoadingBalance={getLoadingState(asset.id).isLoadingBalance}
+                              isLoadingPrice={getLoadingState(asset.id).isLoadingPrice}
+                              hasBalanceError={!!getLoadingState(asset.id).balanceError}
+                              hasPriceError={!!getLoadingState(asset.id).priceError}
+                              compact
+                            />
                           </Table.Cell>
                         </Table.Row>
                       );

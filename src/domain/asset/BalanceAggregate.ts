@@ -212,12 +212,14 @@ export class BalanceAggregate {
     const balanceNeedsRefresh = 
       staleCheck.balance || 
       !this._data.loadingState.isBalanceFresh() ||
-      this._data.loadingState.getBalanceStatus() === 'error';
+      this._data.loadingState.getBalanceStatus() === 'error' ||
+      this._data.loadingState.getBalanceStatus() === 'stale';
     
     const priceNeedsRefresh = 
       staleCheck.price || 
       !this._data.loadingState.isPriceFresh() ||
       this._data.loadingState.getPriceStatus() === 'error' ||
+      this._data.loadingState.getPriceStatus() === 'stale' ||
       !this._data.price ||
       this._data.price.isExpired();
 

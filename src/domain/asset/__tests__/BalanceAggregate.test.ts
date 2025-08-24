@@ -168,7 +168,7 @@ describe('BalanceAggregate', () => {
   });
 
   describe('should merge aggregates correctly', () => {
-    it('Multiple accounts with same asset', () => {
+    it('Multiple accounts with same asset', async () => {
       // Create second aggregate
       const balance2 = AssetValue.fromString('5', 'ETH');
       const aggregate2 = BalanceAggregate.create(
@@ -182,13 +182,13 @@ describe('BalanceAggregate', () => {
 
       // Add prices with different timestamps
       const olderPrice = Price.live(3000, 'USD');
-      const newerPrice = Price.live(3100, 'USD');
+      aggregate2.updatePrice(olderPrice);
       
       // Wait a bit to ensure timestamp difference
-      setTimeout(() => {
-        aggregate.updatePrice(newerPrice);
-      }, 10);
-      aggregate2.updatePrice(olderPrice);
+      await new Promise(resolve => setTimeout(resolve, 10));
+      
+      const newerPrice = Price.live(3100, 'USD');
+      aggregate.updatePrice(newerPrice);
 
       // Merge aggregates
       const merged = aggregate.merge(aggregate2);
@@ -279,7 +279,9 @@ describe('BalanceAggregate', () => {
   describe('Refresh logic', () => {
     it('should determine when refresh is needed', () => {
       // Fresh data - no refresh needed
+      aggregate.startBalanceLoading();
       aggregate.updateBalance(AssetValue.fromString('10', 'ETH'));
+      aggregate.startPriceLoading();
       aggregate.updatePrice(Price.live(3000, 'USD'));
       
       let refreshNeeds = aggregate.needsRefresh();
@@ -305,6 +307,9 @@ describe('BalanceAggregate', () => {
 
   describe('Display and formatting', () => {
     it('should provide comprehensive display metadata', () => {
+      aggregate.startBalanceLoading();
+      aggregate.updateBalance(AssetValue.fromString('10', 'ETH'));
+      aggregate.startPriceLoading();
       aggregate.updatePrice(Price.live(3000, 'USD'));
       
       const metadata = aggregate.getDisplayMetadata();

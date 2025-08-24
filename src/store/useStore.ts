@@ -75,6 +75,26 @@ interface AppState {
   removeAsset: (id: string) => void;
   getAssetsByAccount: (accountId: string) => Asset[];
   
+  // Progressive Loading States
+  assetLoadingStates: Map<string, {
+    isLoadingBalance: boolean;
+    isLoadingPrice: boolean;
+    balanceError?: string;
+    priceError?: string;
+  }>;
+  setAssetLoadingState: (assetId: string, state: {
+    isLoadingBalance?: boolean;
+    isLoadingPrice?: boolean;
+    balanceError?: string;
+    priceError?: string;
+  }) => void;
+  getAssetLoadingState: (assetId: string) => {
+    isLoadingBalance: boolean;
+    isLoadingPrice: boolean;
+    balanceError?: string;
+    priceError?: string;
+  };
+  
   // Portfolio
   portfolio: PortfolioState;
   updatePortfolio: (updates: Partial<PortfolioState>) => void;
@@ -97,6 +117,7 @@ export const useStore = create<AppState>()(
       // Initial state
       accounts: [],
       assets: [],
+      assetLoadingStates: new Map(),
       portfolio: {
         totalValue: 0,
         totalAssets: 0,
@@ -153,6 +174,26 @@ export const useStore = create<AppState>()(
       getAssetsByAccount: (accountId) => {
         const state = get();
         return state.assets.filter((asset) => asset.accountId === accountId);
+      },
+
+      // Progressive Loading State actions
+      setAssetLoadingState: (assetId, loadingState) =>
+        set((state) => {
+          const newStates = new Map(state.assetLoadingStates);
+          const current = newStates.get(assetId) || {
+            isLoadingBalance: false,
+            isLoadingPrice: false
+          };
+          newStates.set(assetId, { ...current, ...loadingState });
+          return { assetLoadingStates: newStates };
+        }),
+
+      getAssetLoadingState: (assetId) => {
+        const state = get();
+        return state.assetLoadingStates.get(assetId) || {
+          isLoadingBalance: false,
+          isLoadingPrice: false
+        };
       },
 
       // Portfolio actions
