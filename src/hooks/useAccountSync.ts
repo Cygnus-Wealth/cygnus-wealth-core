@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import { AssetValuator } from '@cygnus-wealth/asset-valuator';
 import { formatBalance } from '../utils/formatters';
@@ -131,12 +131,24 @@ export function useAccountSync() {
     return assets;
   }, [updatePrice]);
 
+  // Use a ref to track the last synced accounts to prevent infinite loops
+  const lastSyncedAccountsRef = useRef<string>('');
+  
   // Sync each wallet account
   useEffect(() => {
+    // Create a unique key for current wallet accounts
+    const accountsKey = walletAccounts.map(a => `${a.id}-${a.address}-${a.platform}`).join(',');
+    
+    // Skip if we've already synced these exact accounts
+    if (accountsKey === lastSyncedAccountsRef.current) {
+      return;
+    }
+    
     const syncAccounts = async () => {
       if (walletAccounts.length === 0) {
         setAssets([]);
         calculateTotalValue();
+        lastSyncedAccountsRef.current = '';
         return;
       }
 
@@ -193,6 +205,9 @@ export function useAccountSync() {
       setAssets(allAssets);
       calculateTotalValue();
       setIsLoading(false);
+      
+      // Mark these accounts as synced
+      lastSyncedAccountsRef.current = accountsKey;
     };
 
     syncAccounts();

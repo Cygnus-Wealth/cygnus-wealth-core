@@ -201,7 +201,7 @@ export const useProgressiveAssetLoading = (
       retryCounters.current.set(`balance-${asset.id}`, currentRetries + 1);
 
       // Retry after a delay if we haven't exceeded retry limit
-      if (currentRetries < retryAttempts) {
+      if (currentRetries < retryAttempts - 1) {
         setTimeout(() => loadAssetBalance(asset), 2000 * (currentRetries + 1));
       }
     }
@@ -248,22 +248,12 @@ export const useProgressiveAssetLoading = (
       retryCounters.current.set(`price-${asset.symbol}`, currentRetries + 1);
 
       // Retry after a delay if we haven't exceeded retry limit
-      if (currentRetries < retryAttempts) {
+      if (currentRetries < retryAttempts - 1) {
         setTimeout(() => loadAssetPrice(asset), 2000 * (currentRetries + 1));
       }
     }
   }, [enablePriceLoading, loadPrice, updateLoadingState, priceTimeout, retryAttempts]);
 
-  // Start progressive loading for all assets
-  const startProgressiveLoading = useCallback(() => {
-    assets.forEach((asset, index) => {
-      // Stagger the loading to avoid overwhelming the API
-      setTimeout(() => {
-        loadAssetBalance(asset);
-        loadAssetPrice(asset);
-      }, index * staggerDelay);
-    });
-  }, [assets, loadAssetBalance, loadAssetPrice, staggerDelay]);
 
   // Get loading state for a specific asset
   const getLoadingState = useCallback((assetId: string): AssetLoadingState => {
@@ -290,18 +280,30 @@ export const useProgressiveAssetLoading = (
   }, [loadingStates, assets.length]);
 
   // Auto-start loading when assets change
+  // Using a ref to track if we've already started loading for current assets
+  const loadingStartedRef = useRef<string>('');
+  
   useEffect(() => {
-    if (assets.length > 0) {
-      const timeoutId = setTimeout(startProgressiveLoading, 100);
-      return () => clearTimeout(timeoutId);
+    // Create a unique key for the current assets to check if we've already started loading
+    const assetsKey = assets.map(a => a.id).join(',');
+    
+    if (assets.length > 0 && loadingStartedRef.current !== assetsKey) {
+      loadingStartedRef.current = assetsKey;
+      
+      // Stagger the loading to avoid overwhelming the API
+      assets.forEach((asset, index) => {
+        setTimeout(() => {
+          loadAssetBalance(asset);
+          loadAssetPrice(asset);
+        }, index * staggerDelay);
+      });
     }
-  }, [assets, startProgressiveLoading]);
+  }, [assets, loadAssetBalance, loadAssetPrice, staggerDelay]);
 
   return {
     loadingStates,
     getLoadingState,
     getOverallStatus,
-    startProgressiveLoading,
     loadAssetBalance,
     loadAssetPrice
   };
